@@ -1,0 +1,34 @@
+/* One-pager layout: letter page, two-column grid of panels. */
+:root { --team-color: #0b162a; --ink: #1d1d1f; --muted: #5f6368; --rule: #e3e3e3; }
+html, body { background: #ffffff; color: var(--ink); }
+body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 11px; line-height: 1.35; margin: 0; }
+.report { max-width: 8in; margin: 0 auto; padding: 0.3in 0.35in; box-sizing: border-box; }
+.header { border-bottom: 3px solid var(--team-color); padding-bottom: 6px; margin-bottom: 8px; }
+.header .team { display: block; font-size: 22px; font-weight: 700; color: var(--team-color); }
+.header .sub { display: block; font-size: 12px; font-weight: 600; }
+.header .asof { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+h3 { font-size: 12px; margin: 0 0 4px 0; line-height: 1.25; }
+.things { background: #f5f6f8; border-left: 4px solid var(--team-color); padding: 6px 10px; margin-bottom: 8px; }
+.things ol { margin: 2px 0 0 0; padding-left: 18px; }
+.things li { margin-bottom: 2px; }
+.things p { margin: 2px 0; }
+.n { color: var(--muted); font-size: 10px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.panel { border-top: 1px solid var(--rule); padding-top: 5px; min-width: 0; }
+.panel.wide { grid-column: 1 / -1; }
+.panel img { max-width: 100%; height: auto; display: block; }
+.report-table { border-collapse: collapse; width: 100%; font-size: 10px; margin-top: 2px; }
+.report-table th { text-align: left; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--rule); padding: 1px 4px 1px 0; }
+.report-table td { padding: 1px 4px 1px 0; border-bottom: 1px solid #f0f0f0; }
+.report-table td:not(:first-child) { white-space: nowrap; }
+.small-n { color: #b3261e; }
+.shift { color: var(--team-color); }
+.footer { margin-top: 8px; border-top: 1px solid var(--rule); padding-top: 5px; font-size: 8.5px; color: var(--muted); }
+.footer p { margin: 2px 0; }
+a { color: inherit; }
+@media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
+  .report { padding: 16px; }
+}
+@page { size: letter; margin: 0; }
+@media print { .report { padding: 0.3in 0.35in; } }

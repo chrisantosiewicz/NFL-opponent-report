@@ -1,0 +1,77 @@
+name: Weekly opponent report
+
+on:
+  schedule:
+    # Tuesday 14:00 UTC (9-10am ET), September through February.
+    - cron: "0 14 * 9-12,1,2 2"
+    # Wednesday retry, in case Monday night's play-by-play wasn't published yet
+    # (the freshness data test fails and Tuesday's run stops before publishing).
+    - cron: "0 14 * 9-12,1,2 3"
+  workflow_dispatch:
+    inputs:
+      team:
+        description: "Team whose next opponent to scout"
+        default: "CHI"
+      date:
+        description: "Pretend today is (YYYY-MM-DD). Blank = today."
+        default: ""
+
+permissions:
+  contents: write   # commit the new report into the archive
+  pages: write
+  id-token: write
+
+concurrency:
+  group: weekly-report
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      FOCAL_TEAM: ${{ inputs.team || 'CHI' }}
+      REPORT_DATE: ${{ inputs.date }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-renv@v2
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      # Load -> build models -> data tests -> render. Any failure stops here,
+      # nothing below runs, and the last good report stays on the site.
+      - name: Run pipeline
+        run: |
+          if [ -z "$REPORT_DATE" ]; then unset REPORT_DATE; fi
+          Rscript run_pipeline.R
+
+      - name: Add report to archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/reports site/index.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Report: $(ls -t site/reports/*.html | head -1 | xargs basename)"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
