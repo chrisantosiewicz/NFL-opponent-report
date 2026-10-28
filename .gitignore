@@ -1,5 +1,5 @@
 # Built locally or in CI; never committed
-data/
+/data/
 report/*.html
 report/*_files/
 report/.quarto/
