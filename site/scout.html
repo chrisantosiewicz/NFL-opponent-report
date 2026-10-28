@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bears Opponent Scout</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a call-sheet. Sticky picker bar, a "what stands out" strip, then one card per situation
+   where every metric is a row with its 32-team strip. */
+:root {
+  --paper: #f6f7f9; --card: #ffffff; --ink: #141a26; --muted: #5c6577; --rule: #dde1e8;
+  --dot: #b7bec9; --accent: #c83803; --warn: #a3470a; --hi: #fff1e8;
+  --display: "Saira Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #0f131b; --card: #161c27; --ink: #e9ecf1; --muted: #9aa3b3; --rule: #2a3242;
+  --dot: #4a5468; --accent: #ff6b2c; --warn: #f0a050; --hi: #2a1d16; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #0f131b; --card: #161c27; --ink: #e9ecf1; --muted: #9aa3b3; --rule: #2a3242;
+  --dot: #4a5468; --accent: #ff6b2c; --warn: #f0a050; --hi: #2a1d16; color-scheme: dark }
+
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--card); }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--card); border-bottom: 1px solid var(--rule); }
+.bar .wrap { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding-block: 10px; }
+.brand { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.04em; text-transform: uppercase; margin-right: auto; }
+.brand b { color: var(--accent); }
+.ctl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+select, .seg button { font: 500 13px var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px; }
+select:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg { display: inline-flex; }
+.seg button { cursor: pointer; border-radius: 0; color: var(--muted); }
+.seg button:first-child { border-radius: 6px 0 0 6px; }
+.seg button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+header.top { padding-block: 22px 8px; display: grid; gap: 4px; }
+.team-name { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 6vw, 46px); line-height: 1; text-transform: uppercase; letter-spacing: 0.01em; text-wrap: balance; border-left: 8px solid var(--team, var(--ink)); padding-left: 12px; }
+.matchup { font-weight: 600; }
+.asof { color: var(--muted); font-size: 13px; }
+.banner { background: var(--hi); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.quick a { font-size: 13px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.quick a:hover { text-decoration: underline; }
+
+.lead { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; padding-block: 12px; }
+.box { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+.box h2 { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 8px; }
+.stands ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.stands .n, .muted { color: var(--muted); font-size: 12px; }
+.notes { border-color: var(--accent); }
+.notes p { margin: 0 0 6px; }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.shift-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.shift-list li { display: flex; justify-content: space-between; gap: 12px; }
+.delta { font-family: var(--mono); font-weight: 500; white-space: nowrap; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; color: var(--muted); font-size: 12px; padding-block: 12px 4px; }
+.legend svg { vertical-align: middle; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding-block: 8px 24px; }
+.sit header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.sit h3 { font-family: var(--display); font-weight: 700; font-size: 20px; text-transform: uppercase; letter-spacing: 0.03em; margin: 0; }
+.tag { font-size: 12px; font-weight: 600; color: var(--accent); }
+.tag.quiet { color: var(--muted); font-weight: 500; }
+.rows { display: grid; }
+.row { display: grid; grid-template-columns: minmax(84px, 1.15fr) 62px minmax(90px, 1.6fr) 48px; gap: 8px; align-items: center; padding-block: 5px; border-top: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+.row .label { font-size: 13px; }
+.row .label small { display: block; color: var(--muted); font-size: 11px; }
+.row .val { font-family: var(--mono); font-size: 14px; font-weight: 500; text-align: right; white-space: nowrap; }
+.row .rank { font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
+.row .rank b { color: var(--ink); font-weight: 600; font-size: 12px; }
+.row.small .val, .row.small .rank b { color: var(--muted); }
+.row.small .rank b::after { content: "*"; color: var(--warn); }
+.row.extreme { background: var(--hi); }
+.strip { width: 100%; height: 26px; display: block; overflow: visible; }
+.strip circle.o { fill: var(--dot); cursor: pointer; }
+.strip circle.o:hover { fill: var(--muted); }
+.strip line.avg { stroke: var(--ink); stroke-width: 1.5; }
+.strip line.base { stroke: var(--rule); }
+.strip circle.me { stroke: var(--ink); stroke-width: 1.5; }
+.empty { color: var(--muted); padding: 40px 0; }
+footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--rule); padding-block: 14px 28px; }
+footer p { margin: 0 0 6px; max-width: 90ch; }
+footer a { color: inherit; }
+
+@media (max-width: 760px) {
+  .lead, .grid { grid-template-columns: minmax(0, 1fr); }
+  .brand { width: 100%; }
+}
+@media (max-width: 420px) {
+  .row { grid-template-columns: minmax(72px, 1fr) 62px minmax(70px, 1.3fr) 40px; gap: 6px; }
+}
+@media (prefers-reduced-motion: no-preference) { .strip circle.me { transition: cx 0.25s ease; } }
+</style>
+</head>
+<body>
+
+<div class="bar"><div class="wrap">
+  <div class="brand">Bears <b>Opponent</b> Scout</div>
+  <label class="ctl" for="team">Team
+    <select id="team"></select></label>
+  <div class="ctl" role="group" aria-label="Window">
+    <span>Window</span>
+    <div class="seg"><button type="button" id="span-season" aria-pressed="true">Season</button><button type="button" id="span-last4" aria-pressed="false">Last 4 games</button></div>
+  </div>
+  <label class="ctl" for="week" id="week-wrap">Week
+    <select id="week"></select></label>
+</div></div>
+
+<main class="wrap" id="app"><p class="empty">Loading this week's numbers…</p></main>
+
+<footer class="wrap">
+  <p><strong>How to read this.</strong> Every dot is one NFL team, ranked on the same plays. The big dot is the team you picked, the dark line is the league average. Pass rate counts sacks and scrambles as passes. Pass rate over expected compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse xpass model). EPA is expected points added per play; above 0 helps the offense. Early downs, 3rd down, red zone and all neutral use only plays with the offense's win probability between 5% and 95%; 2-minute and trailing by 8+ use every play. Numbers on fewer than 30 plays are greyed and marked * and never make "What stands out". Only games before this week are used.</p>
+  <p id="foot-meta"></p>
+</footer>
+
+<script>
+(() => {
+  const SIT = [
+    ["early_down", "Early downs", "1st and 2nd down"],
+    ["third_short", "3rd & 1-3", "short yardage"],
+    ["third_medium", "3rd & 4-6", "medium"],
+    ["third_long", "3rd & 7+", "long"],
+    ["red_zone", "Red zone", "at the 20 or closer"],
+    ["two_minute", "2-minute", "last 2:00 of a half"],
+    ["trailing_8plus", "Trailing by 8+", "every play"],
+    ["all_neutral", "All neutral downs", "every play, 5-95% win prob."]
+  ];
+  const SIT_LABEL = Object.fromEntries(SIT.map(s => [s[0], s[1]]));
+  const SIT_PHRASE = { early_down: "on early downs", third_short: "on 3rd & 1-3", third_medium: "on 3rd & 4-6", third_long: "on 3rd & 7+", red_zone: "in the red zone", two_minute: "in the 2-minute drill", trailing_8plus: "when trailing by 8+", all_neutral: "on neutral downs" };
+  const MET = [
+    ["pass_rate", "Pass rate", "dropbacks"],
+    ["proe", "Pass over expected", "vs. same situation"],
+    ["shotgun_rate", "Shotgun rate", "formation"],
+    ["epa_play", "EPA per play", "all plays"],
+    ["epa_pass", "EPA per dropback", "passes"],
+    ["epa_run", "EPA per run", "designed runs"]
+  ];
+  const MET_LABEL = Object.fromEntries(MET.map(m => [m[0], m[1]]));
+  const MIN_N = 30;
+  const embedded = window.SCOUT_DATA || null;
+  const state = { data: null, index: null, team: null, span: "season" };
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const isEpa = m => m.startsWith("epa");
+  const fmt = (v, m) => v == null ? "–" : (m === "pass_rate" || m === "shotgun_rate") ? Math.round(100 * v) + "%"
+    : m === "proe" ? (Math.round(100 * v) === 0 ? "0 pts" : (v > 0 ? "+" : "−") + Math.abs(Math.round(100 * v)) + " pts")
+    : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+  const fmtDiff = (d, m) => isEpa(m) ? (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(2) : (d >= 0 ? "+" : "−") + Math.abs(Math.round(100 * d)) + " pts";
+  const ord = n => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+  const rankPhrase = (rank, teams, m) => {
+    const high = rank <= teams / 2, pos = high ? rank : teams - rank + 1;
+    const words = { pass_rate: ["most pass-heavy", "most run-heavy"], proe: ["most pass-heavy vs. expected", "most run-heavy vs. expected"],
+      shotgun_rate: ["most shotgun", "most under center"], epa_play: ["most efficient offense", "least efficient offense"],
+      epa_pass: ["most efficient passing game", "least efficient passing game"], epa_run: ["most efficient running game", "least efficient running game"] }[m];
+    const w = words[high ? 0 : 1];
+    return pos === 1 ? "the NFL's " + w : ord(pos) + "-" + w;
+  };
+  const thingSentence = r => {
+    const avg = fmt(r.avg, r.metric), val = fmt(r.value, r.metric);
+    const what = { pass_rate: `${val} pass rate (league avg ${avg})`, proe: `${val} pass rate over expected`,
+      shotgun_rate: `${val} in shotgun (league avg ${avg})`, epa_play: `${val} EPA per play (league avg ${avg})`,
+      epa_pass: `${val} EPA per dropback (league avg ${avg})`, epa_run: `${val} EPA per run (league avg ${avg})` }[r.metric];
+    return `<strong>${esc(SIT_LABEL[r.situation])}:</strong> ${esc(rankPhrase(r.rank, r.teams, r.metric))}, ${esc(what)}. <span class="n">${r.n} plays</span>`;
+  };
+
+  // Rows for the chosen week, indexed. Week 1 has no current rows: fall back to last season.
+  function prepare(d) {
+    const byKey = new Map(), league = new Map();
+    const fallback = !d.current || d.current.length === 0;
+    const rows = fallback ? (d.last_season || []).map(r => ({ ...r, span: "season", games: null, through_week: null })) : d.current;
+    for (const r of rows) {
+      byKey.set(`${r.team}|${r.situation}|${r.span}|${r.metric}`, r);
+      const k = `${r.situation}|${r.span}|${r.metric}`;
+      if (!league.has(k)) league.set(k, []);
+      league.get(k).push(r);
+    }
+    const last = new Map((d.last_season || []).map(r => [`${r.team}|${r.situation}|${r.metric}`, r]));
+    return { ...d, byKey, league, last, fallback, teamInfo: new Map(d.teams.map(t => [t.team, t])) };
+  }
+  const get = (team, sit, span, met) => state.data.byKey.get(`${team}|${sit}|${span}|${met}`);
+
+  function strip(team, sit, span, met, color) {
+    const all = state.data.league.get(`${sit}|${span}|${met}`) || [];
+    const me = all.find(r => r.team === team);
+    if (!all.length) return "";
+    let lo = Math.min(...all.map(r => r.value)), hi = Math.max(...all.map(r => r.value));
+    if (hi - lo < 1e-9) { lo -= 0.01; hi += 0.01; }
+    const W = 200, pad = 7, x = v => pad + (v - lo) / (hi - lo) * (W - 2 * pad);
+    const avg = all[0].avg;
+    const dots = all.filter(r => r.team !== team).map(r =>
+      `<circle class="o" data-team="${esc(r.team)}" cx="${x(r.value).toFixed(1)}" cy="13" r="3.2"><title>${esc(r.team)}: ${fmt(r.value, met)} (${ord(r.rank)}, ${r.n} plays)</title></circle>`).join("");
+    const mine = me ? `<circle class="me" cx="${x(me.value).toFixed(1)}" cy="13" r="6" fill="${esc(color)}"><title>${esc(team)}: ${fmt(me.value, met)}</title></circle>` : "";
+    return `<svg class="strip" viewBox="0 0 ${W} 26" preserveAspectRatio="none" role="img" aria-label="${esc(MET_LABEL[met])} for all 32 teams">
+      <line class="base" x1="${pad}" x2="${W - pad}" y1="13" y2="13"/>
+      <line class="avg" x1="${x(avg).toFixed(1)}" x2="${x(avg).toFixed(1)}" y1="3" y2="23"/>${dots}${mine}</svg>`;
+  }
+
+  function cardTag(team, sit, span) {
+    const key = ["early_down", "red_zone", "all_neutral"].includes(sit) ? "proe" : "pass_rate";
+    const r = get(team, sit, span, key);
+    if (!r) return `<span class="tag quiet">No plays yet</span>`;
+    if (r.n < MIN_N) return `<span class="tag quiet">Small sample (${r.n} plays)</span>`;
+    if (r.pctile >= 0.75) return `<span class="tag">Pass-heavy${key === "proe" ? " vs. expected" : ""} · ${ord(r.rank)}</span>`;
+    if (r.pctile <= 0.25) return `<span class="tag">Run-heavy${key === "proe" ? " vs. expected" : ""} · ${ord(r.rank)}</span>`;
+    return `<span class="tag quiet">Close to league norm</span>`;
+  }
+
+  function shifts(team) {
+    const out = [];
+    for (const [sit] of SIT) for (const [met] of MET) {
+      const s = get(team, sit, "season", met), l = get(team, sit, "last4", met);
+      if (!s || !l || s.games <= 4 || l.n < MIN_N) continue;
+      const d = l.value - s.value, thr = isEpa(met) ? 0.10 : 0.05;
+      if (Math.abs(d) >= thr) out.push({ sit, met, s, l, d, z: Math.abs(d) / thr });
+    }
+    return out.sort((a, b) => b.z - a.z).slice(0, 6);
+  }
+
+  function notesHtml(text) {
+    const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    let html = "", inList = false;
+    for (const ln of lines) {
+      if (/^[-*] /.test(ln)) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${esc(ln.slice(2))}</li>`; }
+      else { if (inList) { html += "</ul>"; inList = false; } if (!/^#/.test(ln)) html += `<p>${esc(ln)}</p>`; }
+    }
+    return html + (inList ? "</ul>" : "");
+  }
+
+  async function loadNotes(slug) {
+    if (embedded) return (window.SCOUT_NOTES || {})[slug] || null;
+    try { const r = await fetch(`notes/${slug}.md`, { cache: "no-cache" }); return r.ok ? await r.text() : null; } catch { return null; }
+  }
+
+  async function render() {
+    const d = state.data, team = state.team, span = state.span;
+    const info = d.teamInfo.get(team) || { name: team, nick: team, color: "#888" };
+    const focal = d.teamInfo.get(d.focal_team);
+    const game = (d.games || []).find(g => g.team === team);
+    const anyRow = get(team, "all_neutral", "season", "epa_play");
+    const color = info.color;
+    document.documentElement.style.setProperty("--team", color);
+    const wk = String(d.week).padStart(2, "0");
+    const slug = `${d.season}-week${wk}-${team}`;
+
+    let matchup = "No game this week";
+    if (game) {
+      const opp = d.teamInfo.get(game.opponent);
+      const day = new Date(game.gameday + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+      matchup = game.is_home ? `${opp.nick} at ${info.nick}` : `${info.nick} at ${opp.nick}`;
+      matchup += ` · Week ${d.week} · ${day}`;
+    }
+    const isFocalOpp = team === d.focal_opponent;
+    const asof = d.fallback
+      ? `No ${d.season} games yet. Every number below is from the full ${d.season - 1} season.`
+      : anyRow ? `Data through Week ${anyRow.through_week} (${anyRow.games} games). Only games before Week ${d.week}. Ranks are among all 32 teams.` : "";
+
+    const things = d.fallback ? [] : (d.things || []).filter(t => t.team === team).slice(0, 3)
+      .map(t => ({ ...t, ...get(team, t.situation, "season", t.metric) }));
+    const sh = d.fallback ? [] : shifts(team);
+    const notes = await loadNotes(slug);
+    if (state.team !== team || state.span !== span) return;  // a newer render started
+
+    const pdf = !embedded && isFocalOpp ? `<a href="reports/${slug}.html">Open the print one-pager</a><a href="reports/${slug}.pdf">PDF</a>` : "";
+    const backToOpp = team !== d.focal_opponent && d.focal_opponent ? `<a href="#${esc(d.focal_opponent)}">Back to the ${esc(focal ? focal.nick : "Bears")}' opponent (${esc(d.focal_opponent)})</a>` : "";
+
+    $("app").innerHTML = `
+      <header class="top">
+        <div class="team-name">${esc(info.name)} offense</div>
+        <div class="matchup">${esc(matchup)}${isFocalOpp ? ` · <span style="color:var(--accent)">${esc(focal ? focal.nick : "")}’ next opponent</span>` : ""}</div>
+        <div class="asof">${esc(asof)}</div>
+        ${d.fallback ? "" : span === "last4" ? `<div class="banner">Showing the last 4 games only. Samples are smaller, so more rows are greyed out.</div>` : ""}
+        <div class="quick">${pdf}${backToOpp}</div>
+      </header>
+      <section class="lead">
+        <div class="box stands">
+          <h2>What stands out${things.length ? ` (${things.length})` : ""}</h2>
+          ${things.length ? `<ol>${things.map(t => `<li>${thingSentence(t)}</li>`).join("")}</ol>`
+            : `<p class="muted">Nothing is in the league's top or bottom 4 on at least 30 plays${d.fallback ? " (no games yet this season)" : ""}.</p>`}
+          <p class="muted" style="margin:8px 0 0">Rule: top or bottom 4 of 32 on 30+ plays this season, one per situation.</p>
+        </div>
+        <div class="box ${notes ? "notes" : ""}">
+          ${notes ? `<h2>Staff notes</h2>${notesHtml(notes)}` : `<h2>Tendency shifts</h2>${
+            sh.length ? `<ul class="shift-list">${sh.map(s => `<li><span>${esc(SIT_LABEL[s.sit])}, ${esc(MET_LABEL[s.met])}: ${fmt(s.s.value, s.met)} → ${fmt(s.l.value, s.met)} <span class="muted">(${s.l.n} plays)</span></span><span class="delta">${fmtDiff(s.d, s.met)}</span></li>`).join("")}</ul>`
+            : `<p class="muted">${d.fallback ? "No games yet this season." : anyRow && anyRow.games <= 4 ? "Not enough games yet: the last 4 games are the whole season." : "No big changes in the last 4 games."}</p>`}
+            <p class="muted" style="margin:8px 0 0">Shift: last 4 games differ from the season by 5+ points (0.10 EPA) on 30+ plays.</p>`}
+        </div>
+        ${notes ? `<div class="box" style="grid-column:1/-1"><h2>Tendency shifts</h2>${
+            sh.length ? `<ul class="shift-list">${sh.map(s => `<li><span>${esc(SIT_LABEL[s.sit])}, ${esc(MET_LABEL[s.met])}: ${fmt(s.s.value, s.met)} → ${fmt(s.l.value, s.met)} <span class="muted">(${s.l.n} plays)</span></span><span class="delta">${fmtDiff(s.d, s.met)}</span></li>`).join("")}</ul>`
+            : `<p class="muted">No big changes in the last 4 games.</p>`}</div>` : ""}
+      </section>
+      <div class="legend">
+        <span><svg width="64" height="16" aria-hidden="true"><line x1="2" x2="62" y1="8" y2="8" stroke="var(--rule)"/><circle cx="12" cy="8" r="3.2" fill="var(--dot)"/><circle cx="22" cy="8" r="3.2" fill="var(--dot)"/><line x1="34" x2="34" y1="1" y2="15" stroke="var(--ink)" stroke-width="1.5"/><circle cx="48" cy="8" r="6" fill="${esc(color)}" stroke="var(--ink)" stroke-width="1.5"/></svg>
+          Other teams · league average · ${esc(info.nick)}</span>
+        <span>Left to right = lowest to highest. Tap a dot to scout that team.</span>
+        <span><b style="color:var(--warn)">*</b> under 30 plays</span>
+      </div>
+      <section class="grid">
+        ${SIT.map(([sit, label, sub]) => `
+          <article class="box sit">
+            <header><h3>${esc(label)}</h3>${cardTag(team, sit, span)}</header>
+            <div class="rows">
+              ${MET.map(([met, mlabel, msub]) => {
+                const r = get(team, sit, span, met);
+                if (!r) return `<div class="row small"><div class="label">${esc(mlabel)}<small>${esc(msub)}</small></div><div class="val">–</div><div></div><div class="rank">no plays</div></div>`;
+                const small = r.n < MIN_N, extreme = !small && (r.pctile >= 0.9 || r.pctile <= 0.1);
+                const prev = d.fallback ? null : d.last.get(`${team}|${sit}|${met}`);
+                const tip = `${r.n} plays${prev ? ` · last season ${fmt(prev.value, met)} (${ord(prev.rank)})` : ""}`;
+                return `<div class="row${small ? " small" : ""}${extreme ? " extreme" : ""}" title="${esc(tip)}">
+                  <div class="label">${esc(mlabel)}<small>${r.n} plays${prev ? ` · '${String(d.season - 1).slice(2)}: ${fmt(prev.value, met)}` : ""}</small></div>
+                  <div class="val">${fmt(r.value, met)}</div>
+                  <div>${strip(team, sit, span, met, color)}</div>
+                  <div class="rank"><b>${ord(r.rank)}</b></div></div>`;
+              }).join("")}
+            </div>
+          </article>`).join("")}
+      </section>`;
+    $("foot-meta").innerHTML = `Updated ${esc(d.updated)}. Data: <a href="https://github.com/nflverse" target="_blank" rel="noopener">nflverse</a> play-by-play (nflfastR / nflreadr), openly licensed. Built by Chris Antosiewicz · <a href="https://github.com/chrisantosiewicz/nfl-opponent-report" target="_blank" rel="noopener">source</a>.`;
+    document.title = `${team} · Bears Opponent Scout`;
+  }
+
+  function fillTeams() {
+    const d = state.data, opp = new Map((d.games || []).map(g => [g.team, g.opponent]));
+    const teams = [...d.teams].sort((a, b) => a.name.localeCompare(b.name));
+    $("team").innerHTML = teams.map(t => `<option value="${esc(t.team)}">${esc(t.name)}${opp.has(t.team) ? ` (vs ${esc(opp.get(t.team))})` : " (bye)"}</option>`).join("");
+  }
+
+  function pickTeamFromHash() {
+    const h = decodeURIComponent(location.hash.slice(1)).toUpperCase();
+    const d = state.data;
+    if (h && d.teamInfo.has(h)) return h;
+    return d.focal_opponent || (d.games && d.games[0] && d.games[0].team) || d.teams[0].team;
+  }
+
+  function setTeam(t) {
+    state.team = t; $("team").value = t;
+    if (location.hash.slice(1) !== t) history.replaceState(null, "", "#" + t);
+    render();
+  }
+
+  async function loadWeek(file) {
+    const raw = embedded || await (await fetch(`data/${file}`, { cache: "no-cache" })).json();
+    state.data = prepare(raw);
+    fillTeams();
+    setTeam(pickTeamFromHash());
+  }
+
+  $("team").addEventListener("change", e => setTeam(e.target.value));
+  window.addEventListener("hashchange", () => { if (state.data) { const t = pickTeamFromHash(); if (t !== state.team) setTeam(t); } });
+  $("app").addEventListener("click", e => { const c = e.target.closest("circle.o"); if (c) { setTeam(c.dataset.team); window.scrollTo({ top: 0 }); } });
+  for (const sp of ["season", "last4"]) $("span-" + sp).addEventListener("click", () => {
+    state.span = sp;
+    $("span-season").setAttribute("aria-pressed", sp === "season"); $("span-last4").setAttribute("aria-pressed", sp === "last4");
+    render();
+  });
+  $("week").addEventListener("change", e => loadWeek(e.target.value));
+
+  (async () => {
+    try {
+      if (embedded) { $("week-wrap").hidden = true; await loadWeek(null); return; }
+      state.index = await (await fetch("data/index.json", { cache: "no-cache" })).json();
+      const weeks = state.index.weeks || [];
+      $("week").innerHTML = weeks.map(w => `<option value="${esc(w.file)}">${w.season} Week ${w.week}${w.focal_opponent ? ` · ${esc(w.focal_opponent)}` : ""}</option>`).join("");
+      if (weeks.length < 2) $("week-wrap").hidden = true;
+      await loadWeek(weeks[0].file);
+    } catch (err) {
+      $("app").innerHTML = `<p class="empty">This week's numbers didn't load. Refresh the page; if it still fails, the weekly update may not have published yet.</p>`;
+      console.error(err);
+    }
+  })();
+})();
+</script>
+</body>
+</html>

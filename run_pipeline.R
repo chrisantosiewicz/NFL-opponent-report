@@ -46,6 +46,9 @@ if (!is.null(opponent)) {
 }
 if (nrow(games) == 0) stop("Nothing to scout on or after ", run_date)
 
+# All 32 teams for the report week, for the live page.
+export_site_data(con, games$season[1], games$week[1], team)
+
 # Close the write connection so Quarto can open the database read-only.
 dbDisconnect(con, shutdown = TRUE)
 on.exit()

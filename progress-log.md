@@ -14,3 +14,9 @@
 - Verified on real nflverse data (2024–2026 through Week 7): all models build, all 10 tests pass; the leakage test fails when the `<` guard is changed to `<=`.
 - League 3rd-down shotgun rate: ~98% on 3rd & 7+, ~97% on 3rd & 4–6, 62–70% on 3rd & 1–3 (to compare with the thesis).
 - Next for Chris: setup steps at the end of `docs/walkthrough.md` (Pages, renv lock, first manual run), then the ✍️ exercises.
+
+## 2026-10-28: Live page (Claude, at Chris's request)
+- Added `export_site_data()`: one DuckDB `COPY` per week writes every team's ranks to `site/data/<season>-week<NN>.json`, after the data tests.
+- Added `site/scout.html`: pick any team, season or last 4 games, each metric on a 32-team strip; under-30-play numbers greyed; "What stands out" and shifts use the same rules as the one-pager. Staff notes go in `site/notes/<slug>.md`.
+- Rebuilt the data through Week 7: all 10 tests pass. The Week 8 SEA one-pager committed Oct 26 predates SEA's Week 7 game (Oct 25 vs KC), so the first workflow run will refresh it.
+- Not verified: `export_site_data()` in R (no R here; the same SQL was run through DuckDB directly).

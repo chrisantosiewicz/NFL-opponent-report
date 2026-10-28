@@ -30,8 +30,10 @@ Needs R, Quarto, and the packages in `DESCRIPTION` (pinned in `renv.lock`: run `
 | Ranks | `sql/models/13_tendency_ranks.sql`, `14_last_season_ranks.sql` | metric values, n, league rank, percentile; last season's ranks |
 | "3 things" | `sql/models/15_three_things.sql` | top/bottom 10% on 30+ plays, one per situation |
 | Tests | `sql/tests/*.sql` | each must return zero rows, or the run stops |
+| Live data | `sql/export/site_week.sql`, `site_index.sql` via `export_site_data()` | `site/data/<season>-week<NN>.json` (all 32 teams) + `index.json` |
 | Report | `report/opponent_report.qmd` | `site/reports/<season>-week<NN>-<OPP>.html` / `.pdf` |
 | Site | `R/pipeline.R` `build_site()` | `site/index.html`: latest report + archive |
+| Live page | `site/scout.html` | interactive scout: any team, season or last 4, 32-team strips; staff notes from `site/notes/` |
 | Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, publish to Pages |
 
 If any step fails in GitHub Actions, nothing is published, so the last good report stays live and GitHub emails the failure.
