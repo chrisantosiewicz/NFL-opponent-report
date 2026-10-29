@@ -80,10 +80,12 @@ pick_last <- function(sit, met) {
 }
 
 # A table row: metric, this season (value, rank), last season rank, n.
+# In the Week 1 fallback the main numbers already are last season's, so the
+# "Last season" column is dropped.
 metric_row <- function(sit, met) {
   cur <- pick(sit, met)
   prev <- pick_last(sit, met)
-  data.frame(
+  row <- data.frame(
     Metric = METRIC_LABELS[[met]],
     Value = fmt_value(cur$value, met),
     `NFL rank` = fmt_rank(cur$league_rank, cur$league_teams),
@@ -93,6 +95,8 @@ metric_row <- function(sit, met) {
     Plays = fmt_n(cur$n),
     check.names = FALSE
   )
+  if (!has_current) row$`Last season` <- NULL
+  row
 }
 
 html_table <- function(df) {

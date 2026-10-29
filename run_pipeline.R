@@ -44,7 +44,11 @@ if (!is.null(opponent)) {
     find_next_week_matchups(con, run_date)
   })
 }
-if (nrow(games) == 0) stop("Nothing to scout on or after ", run_date)
+if (nrow(games) == 0) {
+  # Off-season (e.g. after the Super Bowl): nothing to do, and not an error.
+  message("Nothing scheduled on or after ", run_date, ". No report this week.")
+  quit(save = "no", status = 0)
+}
 
 # All 32 teams for the report week, for the live page.
 export_site_data(con, games$season[1], games$week[1], team)
@@ -53,9 +57,12 @@ export_site_data(con, games$season[1], games$week[1], team)
 dbDisconnect(con, shutdown = TRUE)
 on.exit()
 
+slugs <- character()
 for (i in seq_len(nrow(games))) {
   message(sprintf("Scouting %s for %s, %d week %d (%s)", games$opponent[i], games$team[i],
                   games$season[i], games$week[i], format(games$gameday[i])))
-  render_report(games[i, ], db_path)
+  slugs <- c(slugs, render_report(games[i, ], db_path))
 }
-build_site()
+# Feature the report rendered first: the focal team's game, or the earliest
+# game of the week in the playoff fallback.
+build_site(latest = slugs[1])

@@ -49,10 +49,11 @@ jobs:
           if [ -z "$REPORT_DATE" ]; then unset REPORT_DATE; fi
           Rscript run_pipeline.R
 
-      # Only the Bears' run on main updates the archive and the live site, so a
-      # manual run for another team or branch can't replace this week's page.
+      # Only the Bears' scheduled or manual runs on main touch the archive and
+      # the live site. A run from another branch or for another team still
+      # renders, and its reports are kept as a downloadable workflow artifact.
       - name: Add report to archive
-        if: (inputs.team || 'CHI') == 'CHI' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && env.FOCAL_TEAM == 'CHI'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -66,13 +67,19 @@ jobs:
           fi
 
       - uses: actions/upload-pages-artifact@v3
-        if: (inputs.team || 'CHI') == 'CHI' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && env.FOCAL_TEAM == 'CHI'
         with:
           path: site
 
+      - uses: actions/upload-artifact@v4
+        if: github.ref != 'refs/heads/main' || env.FOCAL_TEAM != 'CHI'
+        with:
+          name: reports-${{ env.FOCAL_TEAM }}
+          path: site/reports
+
   deploy:
     needs: build
-    if: (inputs.team || 'CHI') == 'CHI' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (inputs.team || 'CHI') == 'CHI'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
