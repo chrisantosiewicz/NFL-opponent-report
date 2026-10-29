@@ -1,6 +1,6 @@
 # Pipeline steps. run_pipeline.R calls these in order:
 #   load_raw_data() -> build_models() -> run_data_tests() -> find_next_game()
-#   -> render_report() -> build_site()
+#   -> export_site_data() -> render_report() -> build_site()
 
 library(DBI)
 library(duckdb)
@@ -101,6 +101,31 @@ find_next_week_matchups <- function(con, on_date = Sys.Date()) {
     FROM stg_team_games g
     JOIN next_week w ON w.season = g.season AND w.week = g.week
     ORDER BY g.gameday, g.game_id, g.is_home", params = list(as.Date(on_date)))
+}
+
+# Fill {{name}} placeholders in a .sql file and run it. Values are integers or
+# team abbreviations checked by the caller, never free text.
+run_sql_template <- function(con, file, ...) {
+  sql <- paste(readLines(file, warn = FALSE), collapse = "\n")
+  vals <- list(...)
+  for (k in names(vals)) sql <- gsub(paste0("{{", k, "}}"), vals[[k]], sql, fixed = TRUE)
+  dbExecute(con, sql)
+}
+
+# Data for the live page (site/scout.html): one JSON file per report week with
+# every team's numbers, plus data/index.json listing the weeks on disk. Runs
+# after the data tests, so it only ever exports tested tables.
+export_site_data <- function(con, season, week, focal_team, site_dir = "site") {
+  stopifnot(grepl("^[A-Z]{2,3}$", focal_team))
+  data_dir <- file.path(site_dir, "data")
+  dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
+  path <- file.path(normalizePath(data_dir), sprintf("%d-week%02d.json", as.integer(season), as.integer(week)))
+  run_sql_template(con, "sql/export/site_week.sql",
+                   season = as.integer(season), week = as.integer(week),
+                   focal_team = focal_team, path = path)
+  run_sql_template(con, "sql/export/site_index.sql", dir = normalizePath(data_dir))
+  message("exported ", path)
+  invisible(path)
 }
 
 report_slug <- function(season, week, opponent) {
