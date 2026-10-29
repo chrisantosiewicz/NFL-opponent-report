@@ -56,7 +56,11 @@ header.top { padding-block: 22px 8px; display: grid; gap: 4px; }
 .stands ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
 .stands .n, .muted { color: var(--muted); font-size: 12px; }
 .notes { border-color: var(--accent); }
+[hidden] { display: none !important; }
+.notes { grid-column: 1 / -1; order: -1; }
+.notes p, .notes ul { max-width: 80ch; }
 .notes p { margin: 0 0 6px; }
+.notes p.draft { font-size: 12px; color: var(--warn); font-weight: 600; }
 .notes ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .shift-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .shift-list li { display: flex; justify-content: space-between; gap: 12px; }
@@ -230,7 +234,7 @@ footer a { color: inherit; }
     let html = "", inList = false;
     for (const ln of lines) {
       if (/^[-*] /.test(ln)) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${esc(ln.slice(2))}</li>`; }
-      else { if (inList) { html += "</ul>"; inList = false; } if (!/^#/.test(ln)) html += `<p>${esc(ln)}</p>`; }
+      else { if (inList) { html += "</ul>"; inList = false; } if (!/^#/.test(ln)) html += `<p${/^draft\b/i.test(ln) ? ' class="draft"' : ""}>${esc(ln)}</p>`; }
     }
     return html + (inList ? "</ul>" : "");
   }
@@ -293,7 +297,7 @@ footer a { color: inherit; }
             : `<p class="muted">${d.fallback ? "No games yet this season." : anyRow && anyRow.games <= 4 ? "Not enough games yet: the last 4 games are the whole season." : "No big changes in the last 4 games."}</p>`}
             <p class="muted" style="margin:8px 0 0">Shift: last 4 games differ from the season by 5+ points (0.10 EPA) on 30+ plays.</p>`}
         </div>
-        ${notes ? `<div class="box" style="grid-column:1/-1"><h2>Tendency shifts</h2>${
+        ${notes ? `<div class="box"><h2>Tendency shifts</h2>${
             sh.length ? `<ul class="shift-list">${sh.map(s => `<li><span>${esc(SIT_LABEL[s.sit])}, ${esc(MET_LABEL[s.met])}: ${fmt(s.s.value, s.met)} → ${fmt(s.l.value, s.met)} <span class="muted">(${s.l.n} plays)</span></span><span class="delta">${fmtDiff(s.d, s.met)}</span></li>`).join("")}</ul>`
             : `<p class="muted">No big changes in the last 4 games.</p>`}</div>` : ""}
       </section>
