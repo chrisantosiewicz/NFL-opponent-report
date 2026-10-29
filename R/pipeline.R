@@ -126,6 +126,7 @@ render_report <- function(game, db_path = "data/nfl.duckdb", out_dir = "site/rep
   )
   # Render from inside report/ so Quarto finds report.css and the figures.
   old_wd <- setwd("report")
+  on.exit(setwd(old_wd), add = TRUE)
   status <- system2("quarto", args)
   setwd(old_wd)
   if (status != 0) stop("quarto render failed for ", slug)
@@ -160,8 +161,9 @@ print_pdf <- function(html) {
 }
 
 # Rebuild the landing page (latest report + archive) from the reports folder.
-# The archive is just every report file on disk, newest first.
-build_site <- function(site_dir = "site") {
+# The archive is just every report file on disk, newest first. `latest` is the
+# report the landing page features; by default the newest file by name.
+build_site <- function(site_dir = "site", latest = NULL) {
   files <- list.files(file.path(site_dir, "reports"), pattern = "\\.html$")
   if (length(files) == 0) stop("no reports to publish")
   slugs <- sort(sub("\\.html$", "", files), decreasing = TRUE)
@@ -173,7 +175,8 @@ build_site <- function(site_dir = "site") {
             slugs[i], p[2], as.integer(p[3]), p[4],
             if (pdf) sprintf(' · <a href="reports/%s.pdf">PDF</a>', slugs[i]) else "")
   }, character(1))
-  latest <- slugs[1]
+  if (is.null(latest)) latest <- slugs[1]
+  if (!latest %in% slugs) stop("latest report ", latest, " not found in ", site_dir, "/reports")
 
   template <- paste(readLines(file.path(site_dir, "index_template.html"), warn = FALSE),
                     collapse = "\n")
