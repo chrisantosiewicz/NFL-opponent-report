@@ -49,7 +49,10 @@ jobs:
           if [ -z "$REPORT_DATE" ]; then unset REPORT_DATE; fi
           Rscript run_pipeline.R
 
+      # Only the Bears' run on main updates the archive and the live site, so a
+      # manual run for another team or branch can't replace this week's page.
       - name: Add report to archive
+        if: (inputs.team || 'CHI') == 'CHI' && github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -63,11 +66,13 @@ jobs:
           fi
 
       - uses: actions/upload-pages-artifact@v3
+        if: (inputs.team || 'CHI') == 'CHI' && github.ref == 'refs/heads/main'
         with:
           path: site
 
   deploy:
     needs: build
+    if: (inputs.team || 'CHI') == 'CHI' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

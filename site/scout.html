@@ -110,7 +110,7 @@ footer a { color: inherit; }
   <div class="brand">Bears <b>Opponent</b> Scout</div>
   <label class="ctl" for="team">Team
     <select id="team"></select></label>
-  <div class="ctl" role="group" aria-label="Window">
+  <div class="ctl" role="group" aria-label="Window" id="span-wrap">
     <span>Window</span>
     <div class="seg"><button type="button" id="span-season" aria-pressed="true">Season</button><button type="button" id="span-last4" aria-pressed="false">Last 4 games</button></div>
   </div>
@@ -218,9 +218,12 @@ footer a { color: inherit; }
     return `<span class="tag quiet">Close to league norm</span>`;
   }
 
+  // The same six numbers the one-pager watches, so both list the same shifts.
+  const WATCH = [["early_down", "proe"], ["early_down", "shotgun_rate"], ["early_down", "epa_play"],
+                 ["third_short", "pass_rate"], ["red_zone", "pass_rate"], ["all_neutral", "epa_play"]];
   function shifts(team) {
     const out = [];
-    for (const [sit] of SIT) for (const [met] of MET) {
+    for (const [sit, met] of WATCH) {
       const s = get(team, sit, "season", met), l = get(team, sit, "last4", met);
       if (!s || !l || s.games <= 4 || l.n < MIN_N) continue;
       const d = l.value - s.value, thr = isEpa(met) ? 0.10 : 0.05;
@@ -271,7 +274,7 @@ footer a { color: inherit; }
       .map(t => ({ ...t, ...get(team, t.situation, "season", t.metric) }));
     const sh = d.fallback ? [] : shifts(team);
     const notes = await loadNotes(slug);
-    if (state.team !== team || state.span !== span) return;  // a newer render started
+    if (state.data !== d || state.team !== team || state.span !== span) return;  // a newer render started
 
     const pdf = !embedded && isFocalOpp ? `<a href="reports/${slug}.html">Open the print one-pager</a><a href="reports/${slug}.pdf">PDF</a>` : "";
     const backToOpp = team !== d.focal_opponent && d.focal_opponent ? `<a href="#${esc(d.focal_opponent)}">Back to the ${esc(focal ? focal.nick : "Bears")}' opponent (${esc(d.focal_opponent)})</a>` : "";
@@ -295,7 +298,7 @@ footer a { color: inherit; }
           ${notes ? `<h2>Staff notes</h2>${notesHtml(notes)}` : `<h2>Tendency shifts</h2>${
             sh.length ? `<ul class="shift-list">${sh.map(s => `<li><span>${esc(SIT_LABEL[s.sit])}, ${esc(MET_LABEL[s.met])}: ${fmt(s.s.value, s.met)} → ${fmt(s.l.value, s.met)} <span class="muted">(${s.l.n} plays)</span></span><span class="delta">${fmtDiff(s.d, s.met)}</span></li>`).join("")}</ul>`
             : `<p class="muted">${d.fallback ? "No games yet this season." : anyRow && anyRow.games <= 4 ? "Not enough games yet: the last 4 games are the whole season." : "No big changes in the last 4 games."}</p>`}
-            <p class="muted" style="margin:8px 0 0">Shift: last 4 games differ from the season by 5+ points (0.10 EPA) on 30+ plays.</p>`}
+            <p class="muted" style="margin:8px 0 0">Shift: in the same six key numbers as the one-pager, last 4 games differ from the season by 5+ points (0.10 EPA) on 30+ plays.</p>`}
         </div>
         ${notes ? `<div class="box"><h2>Tendency shifts</h2>${
             sh.length ? `<ul class="shift-list">${sh.map(s => `<li><span>${esc(SIT_LABEL[s.sit])}, ${esc(MET_LABEL[s.met])}: ${fmt(s.s.value, s.met)} → ${fmt(s.l.value, s.met)} <span class="muted">(${s.l.n} plays)</span></span><span class="delta">${fmtDiff(s.d, s.met)}</span></li>`).join("")}</ul>`
@@ -353,6 +356,9 @@ footer a { color: inherit; }
   async function loadWeek(file) {
     const raw = embedded || await (await fetch(`data/${file}`, { cache: "no-cache" })).json();
     state.data = prepare(raw);
+    // Week 1 shows last season's full-year numbers, which have no last-4 window.
+    $("span-wrap").hidden = state.data.fallback;
+    if (state.data.fallback && state.span !== "season") $("span-season").click();
     fillTeams();
     setTeam(pickTeamFromHash());
   }
