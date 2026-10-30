@@ -51,6 +51,17 @@ things <- dbGetQuery(con, "
   WHERE season = ? AND as_of_week = ? AND team = ? AND priority <= 3
   ORDER BY priority", params = list(season, week, opp_team))
 
+# Players who changed teams this season before this game (trades, plus moves
+# spotted in weekly rosters), with their usage before the move.
+moves <- dbGetQuery(con, "
+  SELECT * FROM trade_impact
+  WHERE season = ? AND as_of_week = ? AND trade_date < ?
+    AND (from_team IN (?, ?) OR to_team IN (?, ?))
+  ORDER BY trade_date DESC, player_name",
+  params = list(season, week, as.Date(params$gameday),
+                opp_team, params$focal_team, opp_team, params$focal_team))
+trade_feed <- dbGetQuery(con, "SELECT * FROM trade_feed_status")
+
 has_current <- any(league$team == opp_team)
 if (!has_current) {
   # Week 1: nothing known this season yet, so show last season's full numbers.
@@ -115,6 +126,12 @@ game_date <- format(as.Date(params$gameday), "%a %b %e, %Y")
 [`r opp_name` offense]{.team}
 [Scouting report for the `r focal_name` · `r season` Week `r week` · `r matchup`, `r game_date`]{.sub}
 [`r if (has_current) sprintf("Data through Week %d (%d games). Only games before this week are used. Ranks are among all 32 teams.", through_week, games_played) else sprintf("No %d games yet: figures below are from the %d season.", season, season - 1)`]{.asof}
+:::
+
+::: {.trades}
+```{r trades, results="asis"}
+cat(trades_panel(moves, opp_team, params$focal_team, trade_feed, as.Date(params$gameday)))
+```
 :::
 
 ::: {.things}
@@ -288,7 +305,7 @@ ggplot(e, aes(y = label)) +
 :::
 
 ::: {.footer}
-**How to read this.** Pass rate counts sacks and scrambles as passes. *Pass rate over expected* compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse `xpass` model). EPA = expected points added; above 0 is good for the offense. Early downs, 3rd down, red zone and "all neutral" use only plays when the offense's win probability was 5–95%. The 2-minute and trailing-by-8+ splits use every play. Numbers marked <span class="small-n">*</span> are under 30 plays: treat them as a hint, not a tendency. Shift = last 4 games differ from the season by 5+ points (0.10 EPA) on 30+ plays.
+**How to read this.** Pass rate counts sacks and scrambles as passes. *Pass rate over expected* compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse `xpass` model). EPA = expected points added; above 0 is good for the offense. Early downs, 3rd down, red zone and "all neutral" use only plays when the offense's win probability was 5–95%. The 2-minute and trailing-by-8+ splits use every play. Numbers marked <span class="small-n">*</span> are under 30 plays: treat them as a hint, not a tendency. Shift = last 4 games differ from the season by 5+ points (0.10 EPA) on 30+ plays. Roster changes lists in-season trades (nflverse trade feed plus a hand-kept list) and other moves seen in weekly rosters; a regular (starting QB, 15%+ of targets, 30%+ of carries, or 60%+ of snaps before the move) is marked ⚠.
 Data: [nflverse](https://github.com/nflverse) play-by-play (nflfastR / nflreadr), openly licensed. Built by Chris Antosiewicz · [source](https://github.com/chrisantosiewicz/nfl-opponent-report).
 :::
 

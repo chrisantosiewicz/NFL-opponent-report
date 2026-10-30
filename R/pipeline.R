@@ -10,8 +10,21 @@ PBP_COLUMNS <- c(
   "game_id", "play_id", "season", "season_type", "week", "posteam", "defteam",
   "play_type", "pass", "rush", "shotgun", "no_huddle", "down", "ydstogo",
   "yardline_100", "half_seconds_remaining", "score_differential", "wp",
-  "xpass", "epa", "success"
+  "xpass", "epa", "success",
+  # gsis ids of the dropback QB (incl. sacks and scrambles), ball carrier on
+  # designed runs, and target: the trade check measures a player's usage with them
+  "passer_id", "rusher_id", "receiver_id"
 )
+
+# Side feeds for the trade check. Each has a fixed column list so a failed
+# download can still write an empty table with the right shape.
+TRADE_COLUMNS <- c("trade_id", "season", "trade_date", "gave", "received",
+                   "pick_season", "pick_round", "pfr_id", "pfr_name")
+SNAP_COLUMNS <- c("game_id", "season", "week", "player", "pfr_player_id", "position",
+                  "team", "offense_snaps", "offense_pct", "defense_snaps", "defense_pct")
+PLAYER_COLUMNS <- c("gsis_id", "pfr_id", "display_name", "position")
+ROSTER_COLUMNS <- c("season", "week", "game_type", "team", "status", "full_name",
+                    "position", "gsis_id", "pfr_id")
 
 connect_db <- function(path = "data/nfl.duckdb", read_only = FALSE) {
   dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
@@ -32,9 +45,50 @@ load_raw_data <- function(con, seasons) {
   dbWriteTable(con, "raw_pbp", pbp, overwrite = TRUE)
   dbWriteTable(con, "raw_schedules", schedules, overwrite = TRUE)
   dbWriteTable(con, "raw_teams", teams, overwrite = TRUE)
+
+  feeds <- rbind(
+    load_side_feed(con, "raw_trades", TRADE_COLUMNS, function() {
+      trades <- nflreadr::load_trades()
+      trades[trades$season %in% seasons, ]
+    }),
+    load_side_feed(con, "raw_snap_counts", SNAP_COLUMNS, function() nflreadr::load_snap_counts(seasons)),
+    load_side_feed(con, "raw_players", PLAYER_COLUMNS, function() nflreadr::load_players()),
+    load_side_feed(con, "raw_rosters_weekly", ROSTER_COLUMNS, function() nflreadr::load_rosters_weekly(seasons))
+  )
+  dbWriteTable(con, "raw_feed_status", feeds, overwrite = TRUE)
   message(sprintf("raw_pbp: %s plays, raw_schedules: %s games",
                   format(nrow(pbp), big.mark = ","), nrow(schedules)))
   invisible(TRUE)
+}
+
+# The trade check's feeds are not worth stopping the weekly report for: if one
+# fails to download, write an empty table with the same columns, and record the
+# failure in raw_feed_status so the report can say the check was incomplete.
+load_side_feed <- function(con, table, columns, fetch) {
+  df <- tryCatch(as.data.frame(fetch()), error = function(e) {
+    message("WARNING: ", table, " feed failed: ", conditionMessage(e))
+    NULL
+  })
+  ok <- !is.null(df) && all(columns %in% names(df))
+  if (!is.null(df) && !ok) {
+    message("WARNING: ", table, " feed is missing columns: ",
+            paste(setdiff(columns, names(df)), collapse = ", "))
+  }
+  df <- if (ok) df[, columns, drop = FALSE] else
+    as.data.frame(setNames(replicate(length(columns), character(), simplify = FALSE), columns))
+  dbWriteTable(con, table, df, overwrite = TRUE)
+  message(sprintf("%s: %s rows%s", table, format(nrow(df), big.mark = ","), if (ok) "" else " (feed failed)"))
+  data.frame(feed = table, ok = ok, rows = nrow(df), loaded_at = Sys.time())
+}
+
+# Trades nflverse hasn't published yet, typed in by hand (config/trades_manual.csv).
+# Loaded on every run, including --skip-load, because the file lives in the repo.
+# Once nflverse has a trade, its manual row is ignored (see 06_stg_trades.sql).
+load_manual_trades <- function(con, path = "config/trades_manual.csv") {
+  manual <- read.csv(path, colClasses = "character", na.strings = "", comment.char = "#")
+  dbWriteTable(con, "raw_trades_manual", manual, overwrite = TRUE)
+  message("raw_trades_manual: ", nrow(manual), " rows")
+  invisible(manual)
 }
 
 # Run every .sql file in a folder, in file-name order (01_, 02_, 10_, ...).
@@ -101,6 +155,53 @@ find_next_week_matchups <- function(con, on_date = Sys.Date()) {
     FROM stg_team_games g
     JOIN next_week w ON w.season = g.season AND w.week = g.week
     ORDER BY g.gameday, g.game_id, g.is_home", params = list(as.Date(on_date)))
+}
+
+# The trade check, printed to the run log. Lists every player who joined or
+# left either team this season before this game (trades, plus moves seen in
+# weekly rosters), and warns when one was a regular for the opponent: the
+# report's season (and maybe last-4) numbers were built with a roster that no
+# longer exists. On GitHub Actions the warnings also show as annotations on
+# the run's summary page. Same rows as the report's Roster changes box.
+check_trades <- function(con, game) {
+  moves <- dbGetQuery(con, "
+    SELECT * FROM trade_impact
+    WHERE season = ? AND as_of_week = ? AND trade_date < ?
+      AND (from_team IN (?, ?) OR to_team IN (?, ?))
+    ORDER BY trade_date, player_name",
+    params = list(game$season, game$week, as.Date(game$gameday),
+                  game$team, game$opponent, game$team, game$opponent))
+  status <- dbGetQuery(con, "SELECT * FROM trade_feed_status")
+  if (!isTRUE(as.logical(status$feeds_ok))) {
+    warn_run("Trade check incomplete: the trade or roster feed failed (see raw_feed_status)")
+  }
+  if (nrow(moves) == 0) {
+    message("Trade check: no in-season moves involving ", game$team, " or ", game$opponent)
+    return(invisible(moves))
+  }
+  for (i in seq_len(nrow(moves))) {
+    m <- moves[i, ]
+    message(sprintf("Trade check: %s %s %s %s -> %s (%s)%s", format(as.Date(m$trade_date)),
+                    ifelse(is.na(m$position), "", m$position), m$player_name,
+                    m$from_team, m$to_team, m$move_type, if (isTRUE(as.logical(m$is_key))) " [regular]" else ""))
+  }
+  key <- moves[moves$is_key & (moves$from_team == game$opponent | moves$to_team == game$opponent), ]
+  if (nrow(key) > 0) {
+    warn_run(sprintf("%s week %d: %s changed teams; %s's tendencies are partly from before",
+                     game$opponent, game$week, paste(key$player_name, collapse = ", "), game$opponent))
+  }
+  roster_only <- moves[moves$move_type == "roster move" & moves$is_key, ]
+  if (nrow(roster_only) > 0) {
+    warn_run(sprintf("Seen in weekly rosters but not in any trade list: %s. If it was a trade, add it to config/trades_manual.csv",
+                     paste(sprintf("%s (%s -> %s)", roster_only$player_name, roster_only$from_team,
+                                   roster_only$to_team), collapse = ", ")))
+  }
+  invisible(moves)
+}
+
+warn_run <- function(text) {
+  message("WARNING: ", text)
+  if (identical(Sys.getenv("GITHUB_ACTIONS"), "true")) cat("::warning title=Trade check::", text, "\n", sep = "")
 }
 
 report_slug <- function(season, week, opponent) {
