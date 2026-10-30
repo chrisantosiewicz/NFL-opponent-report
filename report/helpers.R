@@ -108,3 +108,110 @@ theme_report <- function() {
       panel.spacing.x = ggplot2::unit(14, "pt")
     )
 }
+
+MAX_MOVES <- 5
+KEY_MARK <- "&#9888;"  # warning sign, as an HTML entity so the R locale doesn't matter
+
+# Roster changes panel. `moves` is trade_impact for this report: every player
+# who joined or left either team this season before the game. Trades are all
+# listed; moves seen only in weekly rosters are listed when the player was a
+# regular, so depth churn doesn't crowd the page.
+trades_panel <- function(moves, opp, focal, feed, gameday) {
+  moves <- moves[moves$move_type == "trade" | moves$is_key, ]
+  out <- character()
+  key_opp <- moves[moves$is_key & (moves$from_team == opp | moves$to_team == opp), ]
+
+  key_focal <- moves[moves$is_key & (moves$from_team == focal | moves$to_team == focal), ]
+  any_opp <- any(moves$from_team == opp | moves$to_team == opp)
+  title <- if (nrow(key_opp) > 0) {
+    sprintf("Roster changes: %s %s", opp, paste(move_phrase(key_opp, opp), collapse = ", "))
+  } else if (any_opp) {
+    sprintf("Roster changes: no %s regulars have moved", opp)
+  } else {
+    sprintf("Roster changes: no in-season trades for %s", opp)
+  }
+  if (nrow(key_focal) > 0) {
+    title <- paste0(title, "; ", focal, " ", paste(move_phrase(key_focal, focal), collapse = ", "))
+  }
+  out <- c(out, sprintf("<h3>%s</h3>", title))
+
+  # At most MAX_MOVES rows keep the report on one page: regulars first, then
+  # the most recent. The run log (check_trades) always lists every move.
+  hidden <- max(nrow(moves) - MAX_MOVES, 0)
+  moves <- utils::head(moves[order(!moves$is_key, -as.numeric(as.Date(moves$trade_date))), ], MAX_MOVES)
+
+  if (nrow(moves) > 0) {
+    # Each row is told from the side of the team in this matchup.
+    side <- ifelse(moves$to_team == opp | moves$from_team == opp, opp, focal)
+    joined <- moves$to_team == side
+    since <- ifelse(joined, moves$to_games_since, moves$from_games_since)
+    played <- ifelse(joined, moves$to_games, moves$from_games)
+    rows <- data.frame(
+      Date = format(as.Date(moves$trade_date), "%b %e"),
+      Team = sprintf('<span class="move %s">%s %s</span>', ifelse(joined, "in", "out"),
+                     side, ifelse(joined, "in", "out")),
+      Player = paste0(ifelse(moves$is_key, sprintf('<span class="key" title="regular before the move">%s</span> ', KEY_MARK), ""),
+                      ifelse(is.na(moves$position), "", paste0(moves$position, " ")),
+                      moves$player_name),
+      Move = paste0(ifelse(joined, paste("from", moves$from_team), paste("to", moves$to_team)),
+                    ifelse(moves$move_type == "trade", "", " (roster)")),
+      `Before the move` = vapply(seq_len(nrow(moves)), function(i) usage_phrase(moves[i, ]), ""),
+      `Games since` = sprintf("%d of %d", as.integer(since), as.integer(played)),
+      check.names = FALSE)
+    out <- c(out, knitr::kable(rows, format = "html", escape = FALSE, row.names = FALSE,
+                               table.attr = 'class="report-table"'))
+  }
+
+  if (nrow(key_opp) > 0) {
+    # e.g. "SEA's numbers below cover 7 games, all 7 before Quenton Nelson
+    # arrived and Christian Haynes left. The last-4 column has none after."
+    joined <- key_opp$to_team == opp
+    games <- max(ifelse(joined, key_opp$to_games, key_opp$from_games))
+    since <- ifelse(joined, key_opp$to_games_since, key_opp$from_games_since)
+    who <- paste(key_opp$player_name, ifelse(joined, "arrived", "left"))
+    text <- if (length(unique(since)) == 1) {
+      sprintf("%s's numbers below cover %d games, %s before %s. %s",
+              opp, as.integer(games),
+              if (since[1] == 0) paste("all", games) else as.character(games - since[1]),
+              paste(who, collapse = " and "),
+              if (since[1] == 0) "The last-4 column has none after." else
+                sprintf("The last-4 column has %d after.", min(since[1], 4L)))
+    } else {
+      sprintf("%s's numbers below cover %d games: %s.", opp, as.integer(games),
+              paste(sprintf("%d before %s", as.integer(games - since), who), collapse = "; "))
+    }
+    out <- c(out, sprintf('<p class="stale">%s %s</p>', KEY_MARK, text))
+  }
+
+  notes <- character()
+  if (hidden > 0) notes <- c(notes, sprintf("%d more move%s in the run log.", hidden, if (hidden > 1) "s" else ""))
+  if (!isTRUE(as.logical(feed$feeds_ok))) notes <- c(notes, "The trade or roster feed failed this run, so this list may be incomplete.")
+  latest <- as.Date(feed$latest_feed_trade)
+  if (!is.na(latest) && gameday - latest > 30) {
+    notes <- c(notes, sprintf("nflverse's trade feed has nothing after %s; newer trades come from the hand-kept list and weekly rosters.",
+                              format(latest, "%b %e, %Y")))
+  }
+  if (length(notes) > 0) out <- c(out, sprintf('<p class="n">%s</p>', paste(notes, collapse = " ")))
+  paste(out, collapse = "\n")
+}
+
+# "added G Quenton Nelson" / "lost WR Marvin Harrison Jr."
+move_phrase <- function(m, team) {
+  paste(ifelse(m$to_team == team, "added", "lost"),
+        ifelse(is.na(m$position), m$player_name, paste(m$position, m$player_name)))
+}
+
+# How much the player was used by the team he left, before the move.
+usage_phrase <- function(m) {
+  if (is.na(m$games_before) || m$games_before == 0) {
+    return(sprintf("no snaps for %s", m$from_team))
+  }
+  pct <- if (m$side == "defense") m$def_snap_pct_before else m$off_snap_pct_before
+  parts <- sprintf("%.0f%% of %s %s snaps, %d games", 100 * pct, m$from_team,
+                   if (m$side == "defense") "def." else "off.", as.integer(m$games_before))
+  share <- c(
+    if (isTRUE(m$dropback_share >= 0.05)) sprintf("%.0f%% of dropbacks", 100 * m$dropback_share),
+    if (isTRUE(m$target_share >= 0.05)) sprintf("%.0f%% of targets", 100 * m$target_share),
+    if (isTRUE(m$carry_share >= 0.05)) sprintf("%.0f%% of carries", 100 * m$carry_share))
+  paste(c(parts, share), collapse = ", ")
+}

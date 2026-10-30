@@ -1,0 +1,14 @@
+# Trades typed in by hand, for when a trade happens before nflverse's trade feed
+# (nflreadr::load_trades) has it. One row per PLAYER moved; picks go in notes.
+# Team codes are nflverse's (LA = Rams). pfr_id is optional: without it the
+# player is matched by name to the from_team's snap counts that season.
+# A row is ignored once nflverse has the same player going to the same team.
+# Seeded Oct 30, 2026 from the NFL.com 2026 trade tracker (deadline Nov 10).
+trade_date,from_team,to_team,player_name,position,pfr_id,notes,source_url
+2026-09-28,MIN,NYG,J.J. McCarthy,QB,,MIN gets 2027 5th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-09-30,PIT,DAL,Joey Porter Jr.,CB,,PIT gets 2027 6th (conditional?) and 2028 2nd; NFL.com dates it Oct 1,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-10-07,PHI,BAL,Cam Jurgens,C,,BAL also gets 2027 7th; PHI gets 2027 5th and 2028 2nd,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-10-11,ARI,HOU,Marvin Harrison Jr.,WR,,ARI gets 2027 2nd; 6th/7th swap direction differs by source,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-10-27,IND,SF,DeForest Buckner,DT,,IND gets 2027 4th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-10-27,IND,SEA,Quenton Nelson,G,,IND gets 2027 3rd and 2028 5th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-10-29,TEN,CHI,Jeffery Simmons,DT,,CHI also gets 2028 5th; TEN gets 2027 1st and 4th and 2028 1st (date not cross-checked),https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
