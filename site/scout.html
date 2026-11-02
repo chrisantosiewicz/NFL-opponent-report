@@ -60,6 +60,7 @@ header.top { padding-block: 22px 8px; display: grid; gap: 4px; }
 .notes { grid-column: 1 / -1; order: -1; }
 .notes p, .notes ul { max-width: 80ch; }
 .notes p { margin: 0 0 6px; }
+.notes .note-h { font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase; margin: 12px 0 4px; }
 .notes p.draft { font-size: 12px; color: var(--warn); font-weight: 600; }
 .notes ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .shift-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -237,6 +238,7 @@ footer a { color: inherit; }
     let html = "", inList = false;
     for (const ln of lines) {
       if (/^[-*] /.test(ln)) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${esc(ln.slice(2))}</li>`; }
+      else if (/^## /.test(ln)) { if (inList) { html += "</ul>"; inList = false; } html += `<h3 class="note-h">${esc(ln.slice(3))}</h3>`; }
       else { if (inList) { html += "</ul>"; inList = false; } if (!/^#/.test(ln)) html += `<p${/^draft\b/i.test(ln) ? ' class="draft"' : ""}>${esc(ln)}</p>`; }
     }
     return html + (inList ? "</ul>" : "");
