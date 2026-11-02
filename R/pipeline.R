@@ -184,6 +184,31 @@ export_site_data <- function(con, season, week, focal_team, site_dir = "site") {
   invisible(path)
 }
 
+# The generated first draft of the staff notes for one opponent, as Markdown in
+# site/notes/drafts/. The wording comes from sql/models/22_draft_notes.sql. To
+# publish your own version, copy it to site/notes/ (same file name) and edit;
+# the live page shows site/notes/ first and falls back to the draft.
+write_draft_notes <- function(con, game, dir = "site/notes/drafts") {
+  stopifnot(grepl("^[A-Z]{2,3}$", game$opponent))
+  lines <- dbGetQuery(con, "
+    SELECT kind, text FROM draft_notes
+    WHERE season = ? AND week = ? AND team = ?
+    ORDER BY line", params = list(game$season, game$week, game$opponent))
+  if (nrow(lines) == 0) {
+    message("No draft notes for ", game$opponent, " (no games yet this season)")
+    return(invisible(NULL))
+  }
+  body <- ifelse(lines$kind == "h", paste("##", lines$text),
+          ifelse(lines$kind == "li", paste("-", lines$text), lines$text))
+  dir.create(dir, showWarnings = FALSE, recursive = TRUE)
+  path <- file.path(dir, paste0(report_slug(game$season, game$week, game$opponent), ".md"))
+  writeLines(c(sprintf("# %s, Week %d (draft)", game$opponent, as.integer(game$week)),
+               "Draft: generated from the data. Edit it and save it as site/notes/<same name> to publish your version.",
+               body), path)
+  message("draft notes: ", path)
+  invisible(path)
+}
+
 # The trade check, printed to the run log. Lists every player who joined or
 # left either team this season before this game (trades, plus moves seen in
 # weekly rosters), and warns when one was a regular for the opponent: the

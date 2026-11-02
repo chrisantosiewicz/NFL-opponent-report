@@ -275,7 +275,15 @@ footer a { color: inherit; }
     const things = d.fallback ? [] : (d.things || []).filter(t => t.team === team).slice(0, 3)
       .map(t => ({ ...t, ...get(team, t.situation, "season", t.metric) }));
     const sh = d.fallback ? [] : shifts(team);
-    const notes = await loadNotes(slug);
+    // Staff notes win; otherwise show the pipeline's generated draft for this offense.
+    let notes = await loadNotes(slug), generated = false;
+    const draft = (d.drafts || []).filter(r => r.team === team);
+    if (!notes && draft.length) {
+      generated = true;
+      const forWho = game ? `the ${d.teamInfo.get(game.opponent).nick}` : "their opponent";
+      notes = [`Draft for ${forWho}: generated from the data each week. Staff notes replace it once they're written.`,
+        ...draft.map(r => (r.kind === "h" ? "## " : r.kind === "li" ? "- " : "") + r.text)].join("\n");
+    }
     if (state.data !== d || state.team !== team || state.span !== span) return;  // a newer render started
 
     const pdf = !embedded && isFocalOpp ? `<a href="reports/${slug}.html">Open the print one-pager</a><a href="reports/${slug}.pdf">PDF</a>` : "";
@@ -297,7 +305,7 @@ footer a { color: inherit; }
           <p class="muted" style="margin:8px 0 0">Rule: top or bottom 4 of 32 on 30+ plays this season, one per situation.</p>
         </div>
         <div class="box ${notes ? "notes" : ""}">
-          ${notes ? `<h2>Staff notes</h2>${notesHtml(notes)}` : `<h2>Tendency shifts</h2>${
+          ${notes ? `<h2>${generated ? "Draft notes" : "Staff notes"}</h2>${notesHtml(notes)}` : `<h2>Tendency shifts</h2>${
             sh.length ? `<ul class="shift-list">${sh.map(s => `<li><span>${esc(SIT_LABEL[s.sit])}, ${esc(MET_LABEL[s.met])}: ${fmt(s.s.value, s.met)} → ${fmt(s.l.value, s.met)} <span class="muted">(${s.l.n} plays)</span></span><span class="delta">${fmtDiff(s.d, s.met)}</span></li>`).join("")}</ul>`
             : `<p class="muted">${d.fallback ? "No games yet this season." : anyRow && anyRow.games <= 4 ? "Not enough games yet: the last 4 games are the whole season." : "No big changes in the last 4 games."}</p>`}
             <p class="muted" style="margin:8px 0 0">Shift: in the same six key numbers as the one-pager, last 4 games differ from the season by 5+ points (0.10 EPA) on 30+ plays.</p>`}

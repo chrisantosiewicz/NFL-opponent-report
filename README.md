@@ -34,6 +34,9 @@ Needs R, Quarto, and the packages in `DESCRIPTION` (pinned in `renv.lock`: run `
 | Live data | `sql/export/site_week.sql`, `site_index.sql` via `export_site_data()` | `site/data/<season>-week<NN>.json` (all 32 teams) + `index.json` |
 | Report | `report/opponent_report.qmd` | `site/reports/<season>-week<NN>-<OPP>.html` / `.pdf` |
 | Site | `R/pipeline.R` `build_site()` | `site/index.html`: latest report + archive |
+| Top target | `sql/models/18_game_windows.sql`, `19_receiver_targets.sql`, `20_top_target.sql` | who gets the ball, season vs last 4, the situations where he gets it most |
+| Formation tells | `sql/models/21_formation_tells.sql` | early-down run/pass rate under center and in shotgun, vs the league |
+| Draft notes | `sql/models/22_draft_notes.sql` via `write_draft_notes()` | a narrative game approach + "what to look for" for every matchup, from tendencies, top target and roster moves; `site/notes/drafts/<slug>.md` |
 | Live page | `site/scout.html` | interactive scout: any team, season or last 4, 32-team strips; staff notes from `site/notes/` |
 | Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, publish to Pages |
 

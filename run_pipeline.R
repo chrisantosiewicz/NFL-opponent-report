@@ -51,7 +51,10 @@ if (nrow(games) == 0) {
   quit(save = "no", status = 0)
 }
 
-for (i in seq_len(nrow(games))) check_trades(con, games[i, ])
+for (i in seq_len(nrow(games))) {
+  check_trades(con, games[i, ])
+  write_draft_notes(con, games[i, ])
+}
 
 # All 32 teams for the report week, for the live page.
 export_site_data(con, games$season[1], games$week[1], team)

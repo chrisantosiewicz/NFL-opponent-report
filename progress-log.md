@@ -26,3 +26,11 @@
 - Added: trade feed + `config/trades_manual.csv` + weekly-roster detection → `stg_trades`; `trade_impact` (usage before the move, games since, "regular" flag); 3 data tests; `check_trades()` in the run log with Actions warnings; "Roster changes" box on the report.
 - Found: nflverse's trade feed stops at Apr 17, 2026, so all seven in-season trades are in the manual CSV (seeded from NFL.com's tracker). Rosters also flagged G Christian Haynes SEA → MIA (Week 8), not in any trade list.
 - Verified on real nflverse data through Week 8: all models build, all 13 tests pass, SEA Week 8 and TB Week 9 render on one page. The R side was run with a SQLite stand-in for duckdb (CRAN was blocked in the build container), so the first real run in Actions is the end-to-end check.
+
+## 2026-11-02: Top target, formation tells, generated draft notes (Claude, at Chris's request)
+- Chris asked for the SEA notes to cover the top-target receiver and the Simmons trade, as a narrative approach rather than isolated stat bullets, and for the method to be part of the weekly pipeline.
+- Merged PR #3's trade check into this branch. Simmons (TEN to CHI, Oct 29) is in `config/trades_manual.csv` from NFL.com's tracker; nflverse weekly rosters list him with CHI in Week 8.
+- Added `game_windows`, `receiver_targets`, `top_target`, `formation_tells` and `draft_notes`, plus 4 tests (17 in all, all passing on data through Week 8).
+- `draft_notes` writes "The approach" (identity and whether it works, roster moves on their offense and our defense, the passing game through the top target, 3rd & long and late-half results) and "What to look for" (moves to watch, formation tells, where the top target lines up, watched shifts). The live page shows it for any team without staff notes.
+- Not verified: `write_draft_notes()` in R (no R here; the same query and Markdown were produced from Python).
+
