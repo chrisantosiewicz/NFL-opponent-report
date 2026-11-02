@@ -27,6 +27,7 @@ if (!isTRUE(arg("skip-load", FALSE))) {
   season <- nflreadr::most_recent_season()
   load_raw_data(con, (season - 2):season)
 }
+load_manual_trades(con)
 build_models(con)
 run_data_tests(con)
 
@@ -49,6 +50,8 @@ if (nrow(games) == 0) {
   message("Nothing scheduled on or after ", run_date, ". No report this week.")
   quit(save = "no", status = 0)
 }
+
+for (i in seq_len(nrow(games))) check_trades(con, games[i, ])
 
 # All 32 teams for the report week, for the live page.
 export_site_data(con, games$season[1], games$week[1], team)

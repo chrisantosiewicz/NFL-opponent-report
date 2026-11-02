@@ -38,6 +38,10 @@ SELECT
     xpass,
     epa,
     CAST(success AS INTEGER)       AS is_success,
+    passer_id,                     -- gsis ids, for the trade check
+    rusher_id,
+    receiver_id,
+    air_yards,                     -- for deep targets in receiver_targets
 
     -- Situation flags
     down IN (1, 2)                 AS is_early_down,

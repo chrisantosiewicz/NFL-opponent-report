@@ -12,6 +12,15 @@ h3 { font-size: 12px; margin: 0 0 4px 0; line-height: 1.25; }
 .things ol { margin: 2px 0 0 0; padding-left: 18px; }
 .things li { margin-bottom: 2px; }
 .things p { margin: 2px 0; }
+.trades { border: 1px solid var(--rule); padding: 4px 10px; margin-bottom: 6px; }
+.trades h3 { margin-bottom: 1px; }
+.trades p { margin: 2px 0 0 0; font-size: 10px; }
+.trades .report-table td, .trades .report-table th { padding-top: 0; padding-bottom: 0; }
+.trades .stale { color: #8a4b00; font-weight: 600; }
+.move { font-weight: 600; }
+.move.in { color: #1e6b34; }
+.move.out { color: #b3261e; }
+.key { color: #8a4b00; }
 .n { color: var(--muted); font-size: 10px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
 .panel { border-top: 1px solid var(--rule); padding-top: 5px; min-width: 0; }

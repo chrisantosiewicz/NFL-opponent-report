@@ -20,3 +20,9 @@
 - Added `site/scout.html`: pick any team, season or last 4 games, each metric on a 32-team strip; under-30-play numbers greyed; "What stands out" and shifts use the same rules as the one-pager. Staff notes go in `site/notes/<slug>.md`.
 - Rebuilt the data through Week 7: all 10 tests pass. The Week 8 SEA one-pager committed Oct 26 predates SEA's Week 7 game (Oct 25 vs KC), so the first workflow run will refresh it.
 - Not verified: `export_site_data()` in R (no R here; the same SQL was run through DuckDB directly).
+
+## 2026-10-30: Trade check (Claude, at Chris's request)
+- Chris asked for a check on trades made any time this season up to the deadline (Nov 10, 2026), and a display for it.
+- Added: trade feed + `config/trades_manual.csv` + weekly-roster detection → `stg_trades`; `trade_impact` (usage before the move, games since, "regular" flag); 3 data tests; `check_trades()` in the run log with Actions warnings; "Roster changes" box on the report.
+- Found: nflverse's trade feed stops at Apr 17, 2026, so all seven in-season trades are in the manual CSV (seeded from NFL.com's tracker). Rosters also flagged G Christian Haynes SEA → MIA (Week 8), not in any trade list.
+- Verified on real nflverse data through Week 8: all models build, all 13 tests pass, SEA Week 8 and TB Week 9 render on one page. The R side was run with a SQLite stand-in for duckdb (CRAN was blocked in the build container), so the first real run in Actions is the end-to-end check.
