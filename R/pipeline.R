@@ -14,8 +14,9 @@ PBP_COLUMNS <- c(
   # gsis ids of the dropback QB (incl. sacks and scrambles), ball carrier on
   # designed runs, and target: the trade check measures a player's usage with them
   "passer_id", "rusher_id", "receiver_id",
-  # depth of the target, for the top-receiver model (deep = 20+ air yards)
-  "air_yards"
+  # depth of the target, for the top-receiver model (deep = 20+ air yards),
+  # and yards gained, for production allowed by position on defense
+  "air_yards", "yards_gained"
 )
 
 # Side feeds for the trade check. Each has a fixed column list so a failed
@@ -185,7 +186,7 @@ export_site_data <- function(con, season, week, focal_team, site_dir = "site") {
 }
 
 # The generated first draft of the staff notes for one opponent, as Markdown in
-# site/notes/drafts/. The wording comes from sql/models/22_draft_notes.sql. To
+# site/notes/drafts/. The wording comes from sql/models/25_draft_notes.sql. To
 # publish your own version, copy it to site/notes/ (same file name) and edit;
 # the live page shows site/notes/ first and falls back to the draft.
 write_draft_notes <- function(con, game, dir = "site/notes/drafts") {

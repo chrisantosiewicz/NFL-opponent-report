@@ -42,6 +42,7 @@ SELECT
     rusher_id,
     receiver_id,
     air_yards,                     -- for deep targets in receiver_targets
+    yards_gained,                  -- for production allowed by position
 
     -- Situation flags
     down IN (1, 2)                 AS is_early_down,

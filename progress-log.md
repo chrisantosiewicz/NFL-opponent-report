@@ -34,3 +34,5 @@
 - `draft_notes` writes "The approach" (identity and whether it works, roster moves on their offense and our defense, the passing game through the top target, 3rd & long and late-half results) and "What to look for" (moves to watch, formation tells, where the top target lines up, watched shifts). The live page shows it for any team without staff notes.
 - Not verified: `write_draft_notes()` in R (no R here; the same query and Markdown were produced from Python).
 
+- Added the offensive side: `defense_splits` (runs vs dropbacks allowed by down and distance, red zone, season and last 4) and `defense_vs_position` (WR/TE/RB targets allowed), plus 2 tests (19 in all, all passing). `defense_splits` season totals are checked against the offense-side snapshot so the two views can't drift.
+- `draft_notes` (now `25_`) has four sections every week: Stopping their offense, Attacking their defense, What to look for on defense, What to look for on offense. Their defensive roster moves and ours on offense feed the attack half. Seattle's staff notes got the same sections.

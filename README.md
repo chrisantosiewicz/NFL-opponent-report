@@ -36,7 +36,9 @@ Needs R, Quarto, and the packages in `DESCRIPTION` (pinned in `renv.lock`: run `
 | Site | `R/pipeline.R` `build_site()` | `site/index.html`: latest report + archive |
 | Top target | `sql/models/18_game_windows.sql`, `19_receiver_targets.sql`, `20_top_target.sql` | who gets the ball, season vs last 4, the situations where he gets it most |
 | Formation tells | `sql/models/21_formation_tells.sql` | early-down run/pass rate under center and in shotgun, vs the league |
-| Draft notes | `sql/models/22_draft_notes.sql` via `write_draft_notes()` | a narrative game approach + "what to look for" for every matchup, from tendencies, top target and roster moves; `site/notes/drafts/<slug>.md` |
+| Defense splits | `sql/models/23_defense_splits.sql` | EPA, success rate and yards each defense allows on runs vs dropbacks by situation (early down, 3rd & short/medium/long, red zone), season and last 4, with league rank |
+| Defense vs position | `sql/models/24_defense_vs_position.sql` | EPA per target and yards per game each defense allows to WRs, TEs and RBs, with league rank |
+| Draft notes | `sql/models/25_draft_notes.sql` via `write_draft_notes()` | a narrative for every matchup in two halves (stopping their offense, attacking their defense) plus "what to look for" on each side, from tendencies, top target, defensive splits, position matchups and roster moves; `site/notes/drafts/<slug>.md` |
 | Live page | `site/scout.html` | interactive scout: any team, season or last 4, 32-team strips; staff notes from `site/notes/` |
 | Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, publish to Pages |
 
