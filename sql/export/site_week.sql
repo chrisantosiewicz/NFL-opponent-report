@@ -44,7 +44,7 @@ COPY (
          FROM last_season_ranks
          WHERE season = {{season}} - 1)                   AS last_season,
 
-        -- Generated draft notes for every team's offense this week (25_draft_notes.sql).
+        -- Generated draft notes for every team's offense this week (27_draft_notes.sql).
         (SELECT list({team: team, line: line, kind: kind, text: text} ORDER BY team, line)
          FROM draft_notes
          WHERE season = {{season}} AND week = {{week}})   AS drafts,
