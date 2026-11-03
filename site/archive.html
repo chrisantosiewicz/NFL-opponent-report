@@ -12,17 +12,17 @@
 :root {
   --paper: #f6f7f9; --card: #ffffff; --ink: #141a26; --muted: #5c6577; --rule: #dde1e8;
   --accent: #c83803; --good: #1d7a46; --good-bg: #e3f4ea; --bad: #b42318; --bad-bg: #fde8e6;
-  --none: #5c6577; --none-bg: #eceef2;
+  --none: #5c6577; --none-bg: #eceef2; --held: #1f5fa8; --held-bg: #e4eefa;
   --display: "Saira Condensed", "Arial Narrow", Arial, sans-serif;
   --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --paper: #0f131b; --card: #161c27; --ink: #e9ecf1; --muted: #9aa3b3; --rule: #2a3242; --accent: #ff6b2c;
-  --good: #5fd08f; --good-bg: #12301f; --bad: #ff8a7a; --bad-bg: #3a1a17; --none: #9aa3b3; --none-bg: #232a37; color-scheme: dark } }
+  --good: #5fd08f; --good-bg: #12301f; --bad: #ff8a7a; --bad-bg: #3a1a17; --none: #9aa3b3; --none-bg: #232a37; --held: #8ab8f0; --held-bg: #172a42; color-scheme: dark } }
 :root[data-theme="dark"] {
   --paper: #0f131b; --card: #161c27; --ink: #e9ecf1; --muted: #9aa3b3; --rule: #2a3242; --accent: #ff6b2c;
-  --good: #5fd08f; --good-bg: #12301f; --bad: #ff8a7a; --bad-bg: #3a1a17; --none: #9aa3b3; --none-bg: #232a37; color-scheme: dark }
+  --good: #5fd08f; --good-bg: #12301f; --bad: #ff8a7a; --bad-bg: #3a1a17; --none: #9aa3b3; --none-bg: #232a37; --held: #8ab8f0; --held-bg: #172a42; color-scheme: dark }
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45; }
@@ -71,6 +71,9 @@ header.top { padding-block: 22px 6px; display: grid; gap: 4px; }
 .pill.bad { color: var(--bad); background: var(--bad-bg); }
 .pill.none { color: var(--none); background: var(--none-bg); }
 .pill.mixed { color: var(--accent); background: var(--none-bg); }
+.pill.held { color: var(--held); background: var(--held-bg); }
+.tag { font: 600 11px var(--body); letter-spacing: 0.03em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; color: var(--bad); white-space: nowrap; }
+.verdict { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .call dl { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 2px 10px; font-size: 13px; }
 .call dt { color: var(--muted); }
 .call dd { margin: 0; }
@@ -82,6 +85,7 @@ header.top { padding-block: 22px 6px; display: grid; gap: 4px; }
 .bar-cell { width: 34%; }
 .meter { position: relative; height: 8px; background: var(--none-bg); border-radius: 4px; }
 .meter i { position: absolute; inset: 0 auto 0 0; background: var(--good); border-radius: 4px; }
+.meter i.held { background: var(--held); border-radius: 0 4px 4px 0; }
 .meter b { position: absolute; top: -3px; bottom: -3px; left: 50%; width: 1px; background: var(--muted); }
 .empty { padding: 40px 0; color: var(--muted); }
 .banner { background: var(--none-bg); border-radius: 6px; padding: 8px 12px; font-size: 13px; margin-top: 6px; }
@@ -110,7 +114,7 @@ footer a { color: inherit; }
 <main class="wrap" id="app"><p class="empty">Loading the archive…</p></main>
 
 <footer class="wrap">
-  <p><strong>How to read this.</strong> Each card is the scouting notes for one offense, condensed to one line per call, next to what happened in that game. Tendency calls (what they do) are a Hit when the game showed it. Warnings (a threat to take away, or a soft spot for us to attack) are graded on production, not volume: on defense "Held" means we took it away, since fewer targets can mean our coverage worked. "Mixed" means yards and EPA disagreed. "Didn't come up" means too few plays in the game to say. Calls use only games before that week; the grade uses that game alone.</p>
+  <p><strong>How to read this.</strong> Each card is the scouting notes for one offense, condensed to one line per call, next to what happened in that game. Tendency calls (what they do) are a Hit when the game showed it. Warnings (a threat to take away, or a soft spot for us to attack) are graded on production, not volume. Green means the call was right: on defense "Called it" means the threat showed up (tagged with what it did to us), and on offense "Hit" means the soft spot paid off. Blue "Held" means we took the threat away, so the game can't say whether the call was right; fewer targets can mean our coverage worked. "Mixed" means yards and EPA disagreed. "Didn't come up" means too few plays in the game to say. Calls use only games before that week; the grade uses that game alone.</p>
   <p id="foot-meta"></p>
 </footer>
 
@@ -118,8 +122,10 @@ footer a { color: inherit; }
 (() => {
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const GOOD = new Set(["Hit", "Held"]), BAD = new Set(["Miss", "Hurt us"]);
-  const tone = v => GOOD.has(v) ? "good" : BAD.has(v) ? "bad" : v === "Mixed" ? "mixed" : "none";
+  // Color answers one question: was the scouting right? Held is its own color:
+  // we took the threat away, so the game can't say whether the call was right.
+  const GOOD = new Set(["Hit", "Called it"]), BAD = new Set(["Miss"]);
+  const tone = v => GOOD.has(v) ? "good" : BAD.has(v) ? "bad" : v === "Held" ? "held" : v === "Mixed" ? "mixed" : "none";
   const embedded = window.SCOUT_CARDS || null;
   const state = { data: null, index: null, teamInfo: new Map(), team: null, week: null, focal: "CHI" };
 
@@ -163,7 +169,7 @@ footer a { color: inherit; }
 
   function callHtml(c) {
     return `<div class="call">
-      <div class="head"><span class="name">${esc(c.call)}</span><span class="pill ${tone(c.verdict)}">${esc(c.verdict)}</span></div>
+      <div class="head"><span class="name">${esc(c.call)}</span><span class="verdict"><span class="pill ${tone(c.verdict)}">${esc(c.verdict)}</span>${c.outcome ? `<span class="tag">${esc(c.outcome)}</span>` : ""}</span></div>
       <dl><dt>We said</dt><dd>${esc(c.said)}</dd><dt>What happened</dt><dd>${esc(c.happened)}</dd></dl>
     </div>`;
   }
@@ -173,13 +179,15 @@ footer a { color: inherit; }
     if (!rows.length) return "";
     return `<section class="box season" style="margin-bottom:16px">
       <h2>How each call has held up, ${state.data.season}</h2>
-      <p class="sub">Every team's notes, every graded game this season from Week 2 on. Tendencies: how often the game showed it; half the time (the line) is a coin flip. Warnings: how often it went our way (we took it away, or the soft spot paid off).</p>
+      <p class="sub">Every team's notes, every graded game this season from Week 2 on. Green: the call was right (half the time, the line, is a coin flip). For threats on defense, blue is how often we held them, which the game can't count as right or wrong.</p>
       <table><thead><tr><th>Call</th><th class="num">Rate</th><th class="bar-cell"></th><th class="num">Graded</th></tr></thead><tbody>
-      ${rows.map(r => { const p = r.correct / r.graded; return `<tr><td>${esc(r.call)}</td><td class="num">${Math.round(100 * p)}%</td>
-        <td class="bar-cell"><div class="meter" role="img" aria-label="${Math.round(100 * p)}% right"><i style="width:${(100 * p).toFixed(1)}%"></i><b></b></div></td>
+      ${rows.map(r => { const p = r.correct / r.graded, h = (r.held || 0) / r.graded, threat = r.side === "defense" && r.kind === "warning";
+        const rate = threat ? `Hurt us ${Math.round(100 * p)}% · held ${Math.round(100 * h)}%` : `${Math.round(100 * p)}% right`;
+        return `<tr><td>${esc(r.call)}</td><td class="num">${threat ? `${Math.round(100 * p)}% / <span style="color:var(--held)">${Math.round(100 * h)}%</span>` : `${Math.round(100 * p)}%`}</td>
+        <td class="bar-cell"><div class="meter" role="img" aria-label="${rate}"><i style="width:${(100 * p).toFixed(1)}%"></i>${threat && h ? `<i class="held" style="left:${(100 * p).toFixed(1)}%;width:${(100 * h).toFixed(1)}%"></i>` : ""}<b></b></div></td>
         <td class="num">${r.graded}</td></tr>`; }).join("")}
       </tbody></table>
-      ${state.data.week1_summary && state.data.week1_summary.graded ? `<p class="sub" style="margin:10px 0 0">Not in these rates: Week 1, scouted from last season, went our way on ${Math.round(100 * state.data.week1_summary.correct / state.data.week1_summary.graded)}% of ${state.data.week1_summary.graded} graded calls.</p>` : ""}
+      ${state.data.week1_summary && state.data.week1_summary.graded ? `<p class="sub" style="margin:10px 0 0">Not in these rates: Week 1, scouted from last season, was right on ${Math.round(100 * state.data.week1_summary.correct / state.data.week1_summary.graded)}% of ${state.data.week1_summary.graded} graded calls${state.data.week1_summary.held ? `, and we held ${state.data.week1_summary.held} of the threats` : ""}.</p>` : ""}
       </section>`;
   }
 
@@ -199,6 +207,7 @@ footer a { color: inherit; }
     const tendHit = calls.filter(c => c.kind === "tendency" && c.verdict === "Hit").length;
     const tendN = calls.filter(c => c.kind === "tendency" && c.verdict !== "Didn't come up").length;
     const none = count("Didn't come up");
+    const warn = v => calls.filter(c => c.kind === "warning" && c.verdict === v).length;
     const slug = `${state.data.season}-week${String(week).padStart(2, "0")}-${team}`;
     const weekFile = `${state.data.season}-week${String(week).padStart(2, "0")}.json`;
     const hasWeek = (state.index && (state.index.weeks || []).some(w => w.file === weekFile));
@@ -229,7 +238,7 @@ footer a { color: inherit; }
       </header>
       <section class="tally" aria-label="Report card totals">
         <div class="tile ${tendN && tendHit / tendN >= 0.5 ? "good" : "bad"}"><div class="v">${tendHit} of ${tendN}</div><div class="l">Tendency calls that showed up</div></div>
-        <div class="tile"><div class="v">${count("Held") + count("Hit") - tendHit}<span class="muted" style="font-size:14px"> went our way</span> · ${count("Hurt us") + count("Miss") - calls.filter(c => c.kind === "tendency" && c.verdict === "Miss").length}<span class="muted" style="font-size:14px"> didn't</span></div><div class="l">Warnings and soft spots</div></div>
+        <div class="tile"><div class="v">${warn("Hit") + warn("Called it")}<span class="muted" style="font-size:14px"> called it</span> · <span style="color:var(--held)">${warn("Held")}</span><span class="muted" style="font-size:14px"> held</span> · ${warn("Miss")}<span class="muted" style="font-size:14px"> missed</span></div><div class="l">Threats and soft spots</div></div>
         <div class="tile"><div class="v">${none}</div><div class="l">Didn't come up</div></div>
       </section>
       <section class="cards">

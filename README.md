@@ -43,7 +43,7 @@ Needs R, Quarto, and the packages in `DESCRIPTION` (pinned in `renv.lock`: run `
 | Score splits | `sql/models/28_score_splits.sql` | late-half, 3rd-down, red-zone and overall results by score state (trailing 9+, 1-8, tied, leading 1-8, 9+, plus tied-or-trailing and leading), with median EPA and EPA without the best play |
 | Scout picks | `sql/models/29_scout_picks.sql` | the spots the notes call out (hot throw area, with "outside the hashes" when both sides qualify; run lean; softest and toughest run lanes), chosen once so the notes and report card grade the same thing |
 | Draft notes | `sql/models/30_draft_notes.sql` via `write_draft_notes()` | a narrative for every matchup in two halves (stopping their offense, attacking their defense) plus "what to look for" on each side, from tendencies, top target, defensive splits, position matchups, run lanes and pass areas and roster moves; `site/notes/drafts/<slug>.md` |
-| Report card | `sql/models/31_report_card.sql` | after each game, every call the notes made, in one line, next to what happened and a verdict (Hit / Miss / Mixed for tendencies; Held / Hurt us and Hit / Miss for warnings; Didn't come up) |
+| Report card | `sql/models/31_report_card.sql` | after each game, every call the notes made, in one line, next to what happened and a verdict (Hit / Miss / Mixed for tendencies; Called it / Held for threats on defense, Hit / Miss for soft spots on offense; Didn't come up) |
 | Live page | `site/scout.html` | interactive scout: any team, season or last 4, 32-team strips; staff notes from `site/notes/` |
 | Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, publish to Pages |
 

@@ -9,7 +9,9 @@
 --   warning   a threat to take away (top target, hot spot, a soft spot in
 --             their defense for us). Graded on production, not volume, since
 --             fewer targets can mean our coverage worked:
---             defense side: Held (we took it away) / Hurt us
+--             defense side: Called it (it showed up and hurt us; outcome =
+--             'Hurt us') / Held (we took it away, so the game can't say
+--             whether the call was right)
 --             offense side: Hit (we got it) / Miss
 -- Mixed = yards and EPA disagree (run lanes).
 -- Didn't come up = too few plays in the game to say (thresholds below).
@@ -121,7 +123,7 @@ c_target AS (
         concat(note_epa(tt.epa_per_target), ' EPA per target; everyone else ', note_epa(tt.others_epa_per_target)),
         concat(g.targets, ' targets, ', CAST(g.yards AS INTEGER), ' yards, ', note_epa(g.epa), ' EPA'),
         CASE WHEN g.targets = 0 THEN 'Didn''t come up'   -- likely out, not covered
-             WHEN g.epa / g.targets <= 0.10 THEN 'Held' ELSE 'Hurt us' END
+             WHEN g.epa / g.targets <= 0.10 THEN 'Held' ELSE 'Called it' END
     FROM m
     JOIN top_target tt ON tt.season = m.season AND tt.as_of_week = m.week AND tt.team = m.team
     JOIN tt_game g ON g.season = m.season AND g.week = m.week AND g.team = m.team
@@ -186,7 +188,7 @@ c_hot AS (
              ELSE concat(COUNT(t.play_id), ' throws, ', CAST(SUM(t.yards_gained) AS INTEGER), ' yards, ',
                          note_epa(AVG(t.epa)), ' EPA each') END,
         CASE WHEN COUNT(t.play_id) < 2 THEN 'Didn''t come up'
-             WHEN AVG(t.epa) > sp.league_epa THEN 'Hurt us' ELSE 'Held' END
+             WHEN AVG(t.epa) > sp.league_epa THEN 'Called it' ELSE 'Held' END
     FROM m
     JOIN scout_picks sp ON sp.season = m.season AND sp.week = m.week AND sp.team = m.team AND sp.pick = 'hot_spot'
     LEFT JOIN theirs t ON t.season = m.season AND t.week = m.week AND t.team = m.team
@@ -309,6 +311,7 @@ calls AS (
 
 SELECT m.season, m.week, m.team, m.opponent, m.gameday, m.is_home, m.team_score, m.opponent_score,
        CASE WHEN m.week = 1 THEN 'last_season' ELSE 'in_season' END AS basis,   -- Week 1 is scouted from last season
-       c.call_no, c.side, c.kind, c.call, c.said, c.happened, c.verdict
+       c.call_no, c.side, c.kind, c.call, c.said, c.happened, c.verdict,
+       CASE WHEN c.verdict = 'Called it' THEN 'Hurt us' END AS outcome   -- what it did on the field
 FROM calls c
 JOIN m USING (season, week, team);
