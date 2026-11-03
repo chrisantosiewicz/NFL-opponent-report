@@ -12,6 +12,8 @@
 --   depth: short, deep (nflverse: deep = 15+ air yards)
 --   side:  left, middle, right
 --   zone:  short_left ... deep_right
+--   lane:  short_outside, short_middle, deep_outside, deep_middle (outside =
+--          left or right of the hashes, so a concept run to either side counts)
 -- Shares are within a bucket_type, so they add to 1 (test_play_direction_shares).
 -- Situations and the 5-95% win-probability filter match defense_splits.
 --
@@ -71,6 +73,12 @@ buckets AS (
     WHERE is_pass = 1 AND pass_location IS NOT NULL AND pass_length IS NOT NULL
     UNION ALL
     SELECT season, as_of_week, team, side, span, situation, 'pass', 'side', pass_location,
+           epa, is_success, yards_gained
+    FROM spans
+    WHERE is_pass = 1 AND pass_location IS NOT NULL AND pass_length IS NOT NULL
+    UNION ALL
+    SELECT season, as_of_week, team, side, span, situation, 'pass', 'lane',
+           pass_length || CASE WHEN pass_location = 'middle' THEN '_middle' ELSE '_outside' END,
            epa, is_success, yards_gained
     FROM spans
     WHERE is_pass = 1 AND pass_location IS NOT NULL AND pass_length IS NOT NULL

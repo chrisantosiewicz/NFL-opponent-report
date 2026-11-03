@@ -40,6 +40,11 @@ select:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid
 .seg button:first-child { border-radius: 6px 0 0 6px; }
 .seg button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+nav.views { display: inline-flex; }
+nav.views a { font: 600 13px var(--body); text-decoration: none; color: var(--muted); border: 1px solid var(--rule); padding: 6px 12px; }
+nav.views a:first-child { border-radius: 6px 0 0 6px; }
+nav.views a:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+nav.views a[aria-current="page"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 
 header.top { padding-block: 22px 8px; display: grid; gap: 4px; }
 .team-name { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 6vw, 46px); line-height: 1; text-transform: uppercase; letter-spacing: 0.01em; text-wrap: balance; border-left: 8px solid var(--team, var(--ink)); padding-left: 12px; }
@@ -113,6 +118,7 @@ footer a { color: inherit; }
 
 <div class="bar"><div class="wrap">
   <div class="brand">Bears <b>Opponent</b> Scout</div>
+  <nav class="views" aria-label="Views"><a href="scout.html" aria-current="page">Live scouting</a><a href="archive.html" id="archive-link">Archive</a></nav>
   <label class="ctl" for="team">Team
     <select id="team"></select></label>
   <div class="ctl" role="group" aria-label="Window" id="span-wrap">
@@ -422,7 +428,11 @@ footer a { color: inherit; }
       const weeks = state.index.weeks || [];
       $("week").innerHTML = weeks.map(w => `<option value="${esc(w.file)}">${w.season} Week ${w.week}${w.focal_opponent ? ` · ${esc(w.focal_opponent)}` : ""}</option>`).join("");
       if (weeks.length < 2) $("week-wrap").hidden = true;
-      await loadWeek(weeks[0].file);
+      // ?week=<file> opens an older week (the archive links here); otherwise the newest.
+      const asked = new URLSearchParams(location.search).get("week");
+      const start = weeks.find(w => w.file === asked) || weeks[0];
+      $("week").value = start.file;
+      await loadWeek(start.file);
     } catch (err) {
       $("app").innerHTML = `<p class="empty">This week's numbers didn't load. Refresh the page; if it still fails, the weekly update may not have published yet.</p>`;
       console.error(err);

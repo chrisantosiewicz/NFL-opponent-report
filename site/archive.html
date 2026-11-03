@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scouting Report Archive</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Archive: one past matchup at a time. What the notes said, condensed to one
+   line per call, next to what happened in the game and a verdict. */
+:root {
+  --paper: #f6f7f9; --card: #ffffff; --ink: #141a26; --muted: #5c6577; --rule: #dde1e8;
+  --accent: #c83803; --good: #1d7a46; --good-bg: #e3f4ea; --bad: #b42318; --bad-bg: #fde8e6;
+  --none: #5c6577; --none-bg: #eceef2;
+  --display: "Saira Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #0f131b; --card: #161c27; --ink: #e9ecf1; --muted: #9aa3b3; --rule: #2a3242; --accent: #ff6b2c;
+  --good: #5fd08f; --good-bg: #12301f; --bad: #ff8a7a; --bad-bg: #3a1a17; --none: #9aa3b3; --none-bg: #232a37; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #0f131b; --card: #161c27; --ink: #e9ecf1; --muted: #9aa3b3; --rule: #2a3242; --accent: #ff6b2c;
+  --good: #5fd08f; --good-bg: #12301f; --bad: #ff8a7a; --bad-bg: #3a1a17; --none: #9aa3b3; --none-bg: #232a37; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.bar { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--rule); }
+.bar .wrap { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding-block: 10px; }
+.brand { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.04em; text-transform: uppercase; margin-right: auto; }
+.brand b { color: var(--accent); }
+nav.views { display: inline-flex; }
+nav.views a { font: 600 13px var(--body); text-decoration: none; color: var(--muted); border: 1px solid var(--rule); padding: 6px 12px; }
+nav.views a:first-child { border-radius: 6px 0 0 6px; }
+nav.views a:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+nav.views a[aria-current="page"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.ctl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+select { font: 500 13px var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px; max-width: 70vw; }
+
+header.top { padding-block: 22px 6px; display: grid; gap: 4px; }
+.team-name { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 6vw, 42px); line-height: 1; text-transform: uppercase; border-left: 8px solid var(--team, var(--ink)); padding-left: 12px; }
+.result { font-weight: 600; font-size: 16px; }
+.muted { color: var(--muted); font-size: 13px; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; }
+.quick a { font-size: 13px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.quick a:hover { text-decoration: underline; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding-block: 10px 4px; }
+.chips span { font-size: 12px; color: var(--muted); align-self: center; margin-right: 4px; }
+.chips a { font: 500 12px var(--body); text-decoration: none; color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 10px; }
+.chips a[aria-current="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+.tally { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-block: 12px; }
+.tile { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 14px; }
+.tile .v { font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; }
+.tile .l { font-size: 12px; color: var(--muted); }
+.tile.good .v { color: var(--good); } .tile.bad .v { color: var(--bad); }
+
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding-block: 4px 16px; }
+.box { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+.box h2 { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 2px; }
+.box .sub { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+.call { border-top: 1px solid var(--rule); padding-block: 10px; display: grid; gap: 4px; }
+.call:first-of-type { border-top: 0; }
+.call .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.call .name { font-weight: 600; }
+.pill { font: 600 11px var(--body); letter-spacing: 0.03em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.good { color: var(--good); background: var(--good-bg); }
+.pill.bad { color: var(--bad); background: var(--bad-bg); }
+.pill.none { color: var(--none); background: var(--none-bg); }
+.pill.mixed { color: var(--accent); background: var(--none-bg); }
+.call dl { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 2px 10px; font-size: 13px; }
+.call dt { color: var(--muted); }
+.call dd { margin: 0; }
+
+.season table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.season th, .season td { text-align: left; padding: 6px 4px; border-top: 1px solid var(--rule); vertical-align: middle; }
+.season th { font-weight: 600; color: var(--muted); font-size: 12px; border-top: 0; }
+.season td.num { font-family: var(--mono); white-space: nowrap; width: 1%; }
+.bar-cell { width: 34%; }
+.meter { position: relative; height: 8px; background: var(--none-bg); border-radius: 4px; }
+.meter i { position: absolute; inset: 0 auto 0 0; background: var(--good); border-radius: 4px; }
+.meter b { position: absolute; top: -3px; bottom: -3px; left: 50%; width: 1px; background: var(--muted); }
+.empty { padding: 40px 0; color: var(--muted); }
+footer { color: var(--muted); font-size: 12px; padding-block: 8px 32px; }
+footer a { color: inherit; }
+[hidden] { display: none !important; }
+
+@media (max-width: 760px) {
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .brand { width: 100%; }
+  .call dl { grid-template-columns: minmax(0, 1fr); }
+  .call dt { margin-top: 2px; }
+  .bar-cell { width: 28%; }
+}
+</style>
+</head>
+<body>
+
+<div class="bar"><div class="wrap">
+  <div class="brand">Bears <b>Opponent</b> Scout</div>
+  <nav class="views" aria-label="Views"><a href="scout.html" id="live-link">Live scouting</a><a href="archive.html" aria-current="page">Archive</a></nav>
+  <label class="ctl" for="team">Team <select id="team"></select></label>
+  <label class="ctl" for="week">Week <select id="week"></select></label>
+</div></div>
+
+<main class="wrap" id="app"><p class="empty">Loading the archive…</p></main>
+
+<footer class="wrap">
+  <p><strong>How to read this.</strong> Each card is the scouting notes for one offense, condensed to one line per call, next to what happened in that game. Tendency calls (what they do) are a Hit when the game showed it. Warnings (a threat to take away, or a soft spot for us to attack) are graded on production, not volume: on defense "Held" means we took it away, since fewer targets can mean our coverage worked. "Mixed" means yards and EPA disagreed. "Didn't come up" means too few plays in the game to say. Calls use only games before that week; the grade uses that game alone.</p>
+  <p id="foot-meta"></p>
+</footer>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const GOOD = new Set(["Hit", "Held"]), BAD = new Set(["Miss", "Hurt us"]);
+  const tone = v => GOOD.has(v) ? "good" : BAD.has(v) ? "bad" : v === "Mixed" ? "mixed" : "none";
+  const embedded = window.SCOUT_CARDS || null;
+  const state = { data: null, index: null, teamInfo: new Map(), team: null, week: null, focal: "CHI" };
+
+  function readHash() {
+    const m = decodeURIComponent(location.hash.slice(1)).toUpperCase().match(/^([A-Z]{2,3})(?:-(\d{1,2}))?$/);
+    return m ? { team: m[1], week: m[2] ? +m[2] : null } : {};
+  }
+
+  const gamesFor = team => (state.data.games || []).filter(g => g.team === team).sort((a, b) => b.week - a.week);
+
+  function fillTeams() {
+    const teams = [...new Set((state.data.games || []).map(g => g.team))]
+      .map(t => state.teamInfo.get(t) || { team: t, name: t }).sort((a, b) => a.name.localeCompare(b.name));
+    $("team").innerHTML = teams.map(t => `<option value="${esc(t.team)}">${esc(t.name)}</option>`).join("");
+  }
+
+  function fillWeeks() {
+    $("week").innerHTML = gamesFor(state.team).map(g =>
+      `<option value="${g.week}">Week ${g.week} · vs ${esc(g.opponent)}</option>`).join("");
+    $("week").value = state.week;
+  }
+
+  function pick(team, week) {
+    const list = gamesFor(team);
+    if (!list.length) return;
+    state.team = team;
+    state.week = list.some(g => g.week === week) ? week : list[0].week;
+    $("team").value = team; fillWeeks();
+    const h = `#${team}-${state.week}`;
+    if (location.hash !== h) history.replaceState(null, "", h);
+    render();
+  }
+
+  function resultLine(g) {
+    const me = state.teamInfo.get(g.team) || { nick: g.team }, them = state.teamInfo.get(g.opponent) || { nick: g.opponent };
+    const day = new Date(g.gameday + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+    const [hi, lo] = g.opponent_score >= g.team_score ? [[them, g.opponent_score], [me, g.team_score]] : [[me, g.team_score], [them, g.opponent_score]];
+    const score = g.team_score === g.opponent_score ? `${me.nick} ${g.team_score}, ${them.nick} ${g.opponent_score} (tie)` : `${hi[0].nick} ${hi[1]}, ${lo[0].nick} ${lo[1]}`;
+    return `${score} · Week ${g.week} · ${day}`;
+  }
+
+  function callHtml(c) {
+    return `<div class="call">
+      <div class="head"><span class="name">${esc(c.call)}</span><span class="pill ${tone(c.verdict)}">${esc(c.verdict)}</span></div>
+      <dl><dt>We said</dt><dd>${esc(c.said)}</dd><dt>What happened</dt><dd>${esc(c.happened)}</dd></dl>
+    </div>`;
+  }
+
+  function seasonHtml() {
+    const rows = (state.data.call_summary || []).filter(r => r.graded >= 5);
+    if (!rows.length) return "";
+    return `<section class="box season" style="margin-bottom:16px">
+      <h2>How each call has held up, ${state.data.season}</h2>
+      <p class="sub">Every team's notes, every graded game this season. Tendencies: how often the game showed it; half the time (the line) is a coin flip. Warnings: how often it went our way (we took it away, or the soft spot paid off).</p>
+      <table><thead><tr><th>Call</th><th class="num">Rate</th><th class="bar-cell"></th><th class="num">Graded</th></tr></thead><tbody>
+      ${rows.map(r => { const p = r.correct / r.graded; return `<tr><td>${esc(r.call)}</td><td class="num">${Math.round(100 * p)}%</td>
+        <td class="bar-cell"><div class="meter" role="img" aria-label="${Math.round(100 * p)}% right"><i style="width:${(100 * p).toFixed(1)}%"></i><b></b></div></td>
+        <td class="num">${r.graded}</td></tr>`; }).join("")}
+      </tbody></table></section>`;
+  }
+
+  async function exists(url) {
+    if (embedded) return false;
+    try { const r = await fetch(url, { method: "HEAD", cache: "no-cache" }); return r.ok; } catch { return false; }
+  }
+
+  async function render() {
+    const team = state.team, week = state.week;
+    const g = gamesFor(team).find(x => x.week === week);
+    const info = state.teamInfo.get(team) || { name: team, color: "#888" };
+    const opp = state.teamInfo.get(g.opponent) || { nick: g.opponent };
+    document.documentElement.style.setProperty("--team", info.color || "#888");
+    const calls = g.calls || [];
+    const count = v => calls.filter(c => c.verdict === v).length;
+    const tendHit = calls.filter(c => c.kind === "tendency" && c.verdict === "Hit").length;
+    const tendN = calls.filter(c => c.kind === "tendency" && c.verdict !== "Didn't come up").length;
+    const none = count("Didn't come up");
+    const slug = `${state.data.season}-week${String(week).padStart(2, "0")}-${team}`;
+    const weekFile = `${state.data.season}-week${String(week).padStart(2, "0")}.json`;
+    const hasWeek = (state.index && (state.index.weeks || []).some(w => w.file === weekFile));
+    const [hasNotes, hasReport] = await Promise.all([exists(`notes/${slug}.md`), exists(`reports/${slug}.html`)]);
+    if (state.team !== team || state.week !== week) return;   // a newer pick started
+
+    // Bears' opponents first, as quick links.
+    const focalGames = (state.data.games || []).filter(x => x.opponent === state.focal).sort((a, b) => b.week - a.week);
+    const chips = focalGames.length ? `<div class="chips"><span>${esc((state.teamInfo.get(state.focal) || {}).nick || state.focal)} opponents:</span>${
+      focalGames.map(x => { const won = x.opponent_score > x.team_score ? "W" : x.opponent_score < x.team_score ? "L" : "T";
+        return `<a href="#${esc(x.team)}-${x.week}" aria-current="${x.team === team && x.week === week}">Wk ${x.week} ${esc(x.team)} · ${won} ${x.opponent_score}-${x.team_score}</a>`; }).join("")}</div>` : "";
+
+    const side = s => calls.filter(c => c.side === s);
+    $("app").innerHTML = `
+      ${chips}
+      <header class="top">
+        <div class="team-name">${esc(info.name)} offense</div>
+        <div class="result">${esc(resultLine(g))}</div>
+        <div class="muted">Scouted for the ${esc(opp.nick)}. The calls used games before Week ${week}; the grades use this game only.</div>
+        <div class="quick">
+          ${hasWeek ? `<a href="scout.html?week=${encodeURIComponent(weekFile)}#${esc(team)}">Open the full scouting page for this week</a>` : ""}
+          ${hasNotes ? `<a href="notes/${esc(slug)}.md">Staff notes</a>` : ""}
+          ${hasReport ? `<a href="reports/${esc(slug)}.html">Print one-pager</a>` : ""}
+        </div>
+      </header>
+      <section class="tally" aria-label="Report card totals">
+        <div class="tile ${tendN && tendHit / tendN >= 0.5 ? "good" : "bad"}"><div class="v">${tendHit} of ${tendN}</div><div class="l">Tendency calls that showed up</div></div>
+        <div class="tile"><div class="v">${count("Held") + count("Hit") - tendHit}<span class="muted" style="font-size:14px"> went our way</span> · ${count("Hurt us") + count("Miss") - calls.filter(c => c.kind === "tendency" && c.verdict === "Miss").length}<span class="muted" style="font-size:14px"> didn't</span></div><div class="l">Warnings and soft spots</div></div>
+        <div class="tile"><div class="v">${none}</div><div class="l">Didn't come up</div></div>
+      </section>
+      <section class="cards">
+        <div class="box"><h2>Defense</h2><p class="sub">Stopping the ${esc(info.nick || team)} offense</p>
+          ${side("defense").map(callHtml).join("") || `<p class="muted">No defensive calls that week.</p>`}</div>
+        <div class="box"><h2>Offense</h2><p class="sub">Attacking the ${esc(info.nick || team)} defense</p>
+          ${side("offense").map(callHtml).join("") || `<p class="muted">No offensive calls that week.</p>`}</div>
+      </section>
+      ${seasonHtml()}`;
+    document.title = `${team} Week ${week} · Scouting Report Archive`;
+  }
+
+  async function boot() {
+    try {
+      if (embedded) state.data = embedded;
+      else {
+        state.index = await (await fetch("data/index.json", { cache: "no-cache" })).json();
+        const latest = (state.index.weeks || [])[0];
+        state.focal = latest ? latest.focal_team : "CHI";
+        state.data = await (await fetch(`data/report-cards-${latest.season}.json`, { cache: "no-cache" })).json();
+      }
+      if (embedded && embedded.focal_team) state.focal = embedded.focal_team;
+      state.teamInfo = new Map((state.data.teams || []).map(t => [t.team, t]));
+      if (!(state.data.games || []).length) { $("app").innerHTML = `<p class="empty">No graded games yet this season. Report cards appear the week after each game.</p>`; return; }
+      fillTeams();
+      const h = readHash();
+      const lastFocal = (state.data.games || []).filter(x => x.opponent === state.focal).sort((a, b) => b.week - a.week)[0];
+      const start = h.team && gamesFor(h.team).length ? h : lastFocal ? { team: lastFocal.team, week: lastFocal.week } : { team: state.data.games[0].team };
+      pick(start.team, start.week);
+      $("foot-meta").innerHTML = `Updated ${esc(state.data.updated)}. Data: <a href="https://github.com/nflverse" target="_blank" rel="noopener">nflverse</a> play-by-play, openly licensed.`;
+    } catch (err) {
+      $("app").innerHTML = `<p class="empty">The archive didn't load. Refresh the page; if it still fails, the weekly update may not have published yet.</p>`;
+      console.error(err);
+    }
+  }
+
+  $("team").addEventListener("change", e => pick(e.target.value, null));
+  $("week").addEventListener("change", e => pick(state.team, +e.target.value));
+  window.addEventListener("hashchange", () => { const h = readHash(); if (h.team && (h.team !== state.team || (h.week && h.week !== state.week))) pick(h.team, h.week); });
+  boot();
+})();
+</script>
+</body>
+</html>

@@ -13,6 +13,7 @@ WHERE NOT (
     (bucket_type = 'width' AND bucket IN ('inside', 'off_tackle', 'outside')) OR
     (bucket_type = 'side'  AND bucket IN ('left', 'middle', 'right')) OR
     (bucket_type = 'depth' AND bucket IN ('short', 'deep')) OR
+    (bucket_type = 'lane'  AND bucket IN ('short_outside', 'short_middle', 'deep_outside', 'deep_middle')) OR
     (bucket_type = 'zone'  AND bucket IN ('short_left', 'short_middle', 'short_right',
                                           'deep_left', 'deep_middle', 'deep_right')))
 UNION ALL

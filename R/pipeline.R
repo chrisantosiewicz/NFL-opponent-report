@@ -188,8 +188,19 @@ export_site_data <- function(con, season, week, focal_team, site_dir = "site") {
   invisible(path)
 }
 
+# Writes site/data/report-cards-<season>.json: every graded matchup of the
+# season (the condensed notes and what happened) for the archive page.
+export_report_cards <- function(con, season, site_dir = "site") {
+  data_dir <- file.path(site_dir, "data")
+  dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
+  path <- file.path(normalizePath(data_dir), sprintf("report-cards-%d.json", as.integer(season)))
+  run_sql_template(con, "sql/export/site_report_cards.sql", season = as.integer(season), path = path)
+  message("exported ", path)
+  invisible(path)
+}
+
 # The generated first draft of the staff notes for one opponent, as Markdown in
-# site/notes/drafts/. The wording comes from sql/models/27_draft_notes.sql. To
+# site/notes/drafts/. The wording comes from sql/models/30_draft_notes.sql. To
 # publish your own version, copy it to site/notes/ (same file name) and edit;
 # the live page shows site/notes/ first and falls back to the draft.
 write_draft_notes <- function(con, game, dir = "site/notes/drafts") {

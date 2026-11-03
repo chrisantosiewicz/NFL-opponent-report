@@ -54,6 +54,9 @@ CREATE OR REPLACE MACRO note_bucket(b) AS CASE b
     WHEN 'inside' THEN 'inside' WHEN 'off_tackle' THEN 'off tackle' WHEN 'outside' THEN 'around end'
     WHEN 'left' THEN 'to the left' WHEN 'middle' THEN 'up the middle' WHEN 'right' THEN 'to the right'
     WHEN 'deep' THEN 'deep (15+ air yards)' ELSE replace(b, '_', ' ') END;
+CREATE OR REPLACE MACRO note_area(b, most) AS CASE
+    WHEN b LIKE '%_outside' THEN split_part(b, '_', 1) || ' outside the hashes, most often ' || split_part(most, '_', 2)
+    ELSE replace(b, '_', ' ') END;
 CREATE OR REPLACE MACRO note_yds(x) AS printf('%.1f', x);
 CREATE OR REPLACE MACRO note_dsit(s) AS CASE s
     WHEN 'early_down' THEN 'On early downs' WHEN 'third_short' THEN 'On 3rd & 1-3'
@@ -274,13 +277,8 @@ lean_text AS (
     FROM lean WHERE pick = 1
 ),
 
-best_zone AS (   -- their most dangerous throw, all neutral downs. It has to hold up
-                 -- without its single best play and succeed at least as often as
-                 -- the league does there, so one long gain can't make it.
-    SELECT *, ROW_NUMBER() OVER (PARTITION BY season, week, team ORDER BY rank_wo_best, bucket) AS pick
-    FROM dir
-    WHERE side = 'offense' AND situation = 'all_neutral' AND bucket_type = 'zone'
-      AND plays >= 12 AND rank_wo_best <= 8 AND success_rate >= league_success
+best_zone AS (   -- their most dangerous throw area (chosen in scout_picks)
+    SELECT * EXCLUDE (pick), 1 AS pick FROM scout_picks WHERE pick = 'hot_spot'
 ),
 
 their_dir AS (
@@ -288,7 +286,9 @@ their_dir AS (
         concat_ws(' ',
           (SELECT string_agg(sentence, ' ' ORDER BY sit_order, play_type DESC) FROM lean_text l
            WHERE l.season = m.season AND l.week = m.week AND l.team = m.team),
-          (SELECT concat('Their most dangerous throws go ', note_bucket(bucket), ': ', CAST(round(success_rate * plays) AS INTEGER), ' of ', plays,
+          (SELECT concat('Their most dangerous throws go ', note_area(bucket, most_often),
+                         CASE WHEN most_often IS NOT NULL THEN concat(' (', most_often_plays, ' of ', plays, ')') END, ': ',
+                         CAST(round(success_rate * plays) AS INTEGER), ' of ', plays,
                          ' successful (league ', note_pct(league_success), '), ', note_yds(yards_per_play), ' yards a throw and ',
                          note_epa(epa_per_play), ' EPA (', note_epa(epa_wo_best), ' without the best one, ',
                          note_ord(rank_wo_best), ' in the league).')
@@ -489,12 +489,24 @@ paragraphs AS (
                            note_pct(f.lg_long_share), '), ')
                ELSE concat(note_pct(f.long_share), ' of their third downs have been 7+ to go (league ', note_pct(f.lg_long_share), '), ') END,
           'and there they are ', note_ord(f.tl_rank), ' at ', note_epa(f.tl_play), ' EPA per play.',
-          CASE WHEN f.tm_n >= 30 AND f.tm_pct <= 0.25
-                 THEN concat(' Late in halves they''ve been ', note_ord(f.tm_rank), ' of ', f.teams, ' (', note_epa(f.tm_play),
-                             ' EPA per play on ', f.tm_n, ' plays), so keep everything in front.')
-               WHEN f.tm_n >= 30 AND f.tm_pct >= 0.75
-                 THEN concat(' Late in halves they''ve been dangerous: ', note_ord(f.tm_rank), ' at ', note_epa(f.tm_play),
-                             ' EPA per play on ', f.tm_n, ' plays.') END
+          (SELECT CASE
+             WHEN nl.plays >= 20 AND nl.epa_rank >= nl.ranked_teams - 7
+               THEN concat(' Late in halves when tied or trailing, they''ve been ', note_ord(nl.epa_rank), ' of ', nl.ranked_teams,
+                           ' (', note_epa(nl.epa_per_play), ' EPA per play on ', nl.plays, ' plays; ', note_epa(nl.epa_wo_best),
+                           ' without their best play), so keep everything in front and make one big play the only way out.')
+             WHEN nl.plays >= 20 AND nl.epa_rank <= 8
+               THEN concat(' Late in halves when tied or trailing, they''ve been dangerous: ', note_ord(nl.epa_rank), ' at ',
+                           note_epa(nl.epa_per_play), ' EPA per play on ', nl.plays, ' plays, and ', note_epa(nl.epa_wo_best),
+                           ' without their best play.')
+             END ||
+             CASE WHEN ld.plays >= 8 AND ld.pass_rate <= ld.league_pass_rate - 0.10
+               THEN concat(' With a lead they run the clock: ', note_pct(1 - ld.pass_rate), ' runs late in halves (league ',
+                           note_pct(1 - ld.league_pass_rate), ').') ELSE '' END
+           FROM score_splits nl
+           LEFT JOIN score_splits ld ON ld.season = nl.season AND ld.as_of_week = nl.as_of_week AND ld.team = nl.team
+                AND ld.side = 'offense' AND ld.situation = 'two_minute' AND ld.score_state = 'leading'
+           WHERE nl.season = f.season AND nl.as_of_week = f.week AND nl.team = f.team
+             AND nl.side = 'offense' AND nl.situation = 'two_minute' AND nl.score_state = 'not_leading')
         ) AS p3,
 
         -- What to look for
