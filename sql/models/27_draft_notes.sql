@@ -11,6 +11,7 @@
 --   defense_splits   their defense: EPA allowed vs run and pass by down and distance
 --   defense_vs_position  production they allow to WR / TE / RB targets
 --   play_direction   where they run and throw, and where they get run and thrown on
+--   team_yards       rushing and passing yards per game, gained and allowed
 --   trade_impact     key players who joined or left either team before the game
 --
 -- The wording is a template. It is meant to be edited: save an edited copy as
@@ -53,6 +54,7 @@ CREATE OR REPLACE MACRO note_bucket(b) AS CASE b
     WHEN 'inside' THEN 'inside' WHEN 'off_tackle' THEN 'off tackle' WHEN 'outside' THEN 'around end'
     WHEN 'left' THEN 'to the left' WHEN 'middle' THEN 'up the middle' WHEN 'right' THEN 'to the right'
     WHEN 'deep' THEN 'deep (15+ air yards)' ELSE replace(b, '_', ' ') END;
+CREATE OR REPLACE MACRO note_yds(x) AS printf('%.1f', x);
 CREATE OR REPLACE MACRO note_dsit(s) AS CASE s
     WHEN 'early_down' THEN 'On early downs' WHEN 'third_short' THEN 'On 3rd & 1-3'
     WHEN 'third_long' THEN 'On 3rd & 7+' WHEN 'red_zone' THEN 'In the red zone' ELSE s END;
@@ -64,6 +66,12 @@ WITH matchups AS (
     FROM stg_team_games g
     JOIN dim_team t ON t.team = g.team
     JOIN dim_team o ON o.team = g.opponent
+),
+
+yds AS (   -- yards per game, gained (offense) and allowed (defense)
+    SELECT season, as_of_week AS week, team, side, games, rush_yards, rush_ypg, yards_per_carry, rush_rank,
+           pass_ypg, pass_ypg_rank, rush_ypg_rank, teams
+    FROM team_yards
 ),
 
 r AS (   -- season-to-date numbers, one column per number the template uses
@@ -235,7 +243,8 @@ pos AS (   -- the positions they cover worst and best (20+ targets)
 dir AS (   -- where plays go, season to date (5-95% win probability)
     SELECT season, as_of_week AS week, team, side, situation, play_type, bucket_type, bucket,
            plays, type_plays, share, league_share, share - league_share AS lean,
-           epa_per_play, epa_rank, ranked_teams,
+           epa_per_play, epa_rank, ranked_teams, yards_per_play, median_yards, success_rate,
+           league_success, league_yards, epa_wo_best, rank_wo_best, explosives,
            CASE situation WHEN 'early_down' THEN 1 WHEN 'third_short' THEN 2
                           WHEN 'third_long' THEN 3 WHEN 'red_zone' THEN 4 END AS sit_order
     FROM play_direction
@@ -252,10 +261,11 @@ lean AS (   -- the bucket each offense favors most against the league, per situa
 ),
 
 lean_text AS (
-    SELECT season, week, team, sit_order, play_type, situation, bucket, plays, type_plays, share, league_share,
+    SELECT season, week, team, sit_order, play_type, situation, bucket, plays, type_plays, share, league_share, yards_per_play,
         concat(note_dsit(situation), CASE play_type WHEN 'run' THEN ' they run ' ELSE ' they throw ' END,
                note_bucket(bucket), ' on ', plays, ' of ', type_plays, CASE play_type WHEN 'run' THEN ' runs' ELSE ' throws' END,
                ' (', note_pct(share), '; league ', note_pct(league_share), ')',
+               CASE WHEN plays >= 8 THEN concat(' for ', note_yds(yards_per_play), CASE play_type WHEN 'run' THEN ' yards a carry' ELSE ' yards a throw' END) END,
                CASE WHEN plays >= 10 AND epa_rank <= 8
                       THEN concat(', and it works: ', note_epa(epa_per_play), ' EPA per play, ', note_ord(epa_rank), ' in the league')
                     WHEN plays >= 10 AND epa_rank >= ranked_teams - 7
@@ -264,11 +274,13 @@ lean_text AS (
     FROM lean WHERE pick = 1
 ),
 
-best_zone AS (   -- their most dangerous throw, all neutral downs
-    SELECT *, ROW_NUMBER() OVER (PARTITION BY season, week, team ORDER BY epa_rank, bucket) AS pick
+best_zone AS (   -- their most dangerous throw, all neutral downs. It has to hold up
+                 -- without its single best play and succeed at least as often as
+                 -- the league does there, so one long gain can't make it.
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY season, week, team ORDER BY rank_wo_best, bucket) AS pick
     FROM dir
     WHERE side = 'offense' AND situation = 'all_neutral' AND bucket_type = 'zone'
-      AND plays >= 10 AND epa_rank <= 6
+      AND plays >= 12 AND rank_wo_best <= 8 AND success_rate >= league_success
 ),
 
 their_dir AS (
@@ -276,8 +288,10 @@ their_dir AS (
         concat_ws(' ',
           (SELECT string_agg(sentence, ' ' ORDER BY sit_order, play_type DESC) FROM lean_text l
            WHERE l.season = m.season AND l.week = m.week AND l.team = m.team),
-          (SELECT concat('Their most dangerous throws go ', note_bucket(bucket), ': ', note_epa(epa_per_play),
-                         ' EPA per throw on ', plays, ' (', note_ord(epa_rank), ' in the league).')
+          (SELECT concat('Their most dangerous throws go ', note_bucket(bucket), ': ', CAST(round(success_rate * plays) AS INTEGER), ' of ', plays,
+                         ' successful (league ', note_pct(league_success), '), ', note_yds(yards_per_play), ' yards a throw and ',
+                         note_epa(epa_per_play), ' EPA (', note_epa(epa_wo_best), ' without the best one, ',
+                         note_ord(rank_wo_best), ' in the league).')
            FROM best_zone b WHERE b.season = m.season AND b.week = m.week AND b.team = m.team AND b.pick = 1)
         ) AS p_dir,
         (SELECT concat(CASE play_type WHEN 'run' THEN 'Runs ' ELSE 'Throws ' END, note_bucket(bucket), ' ',
@@ -311,12 +325,14 @@ attack_dir AS (
     SELECT m.season, m.week, m.team,
         concat_ws(' ',
           CASE WHEN rs.bucket <> rh.bucket THEN concat(
-            'On early-down runs they''ve been most vulnerable ', note_bucket(rs.bucket), ' (', note_epa(rs.epa_per_play),
-            ' EPA per run allowed, ', note_most(rs.epa_rank, rs.ranked_teams), ' in the league) and toughest ',
-            note_bucket(rh.bucket), ' (', note_epa(rh.epa_per_play), ', ', note_most(rh.epa_rank, rh.ranked_teams), ').') END,
+            'On early-down runs they''ve been most vulnerable ', note_bucket(rs.bucket), ' (', note_yds(rs.yards_per_play),
+            ' yards a carry and ', note_epa(rs.epa_per_play), ' EPA allowed, ', note_most(rs.epa_rank, rs.ranked_teams),
+            ' in the league) and toughest ', note_bucket(rh.bucket), ' (', note_yds(rh.yards_per_play), ' yards a carry, ',
+            note_epa(rh.epa_per_play), ', ', note_most(rh.epa_rank, rh.ranked_teams), ').') END,
           CASE WHEN ps.bucket <> ph.bucket THEN concat(
-            'Through the air they''ve been most vulnerable on throws ', note_bucket(ps.bucket), ' (', note_epa(ps.epa_per_play),
-            ' per throw, ', note_most(ps.epa_rank, ps.ranked_teams), ') and toughest on throws ', note_bucket(ph.bucket), ' (',
+            'Through the air they''ve been most vulnerable on throws ', note_bucket(ps.bucket), ' (', note_yds(ps.yards_per_play),
+            ' yards and ', note_epa(ps.epa_per_play), ' EPA per throw, ', note_most(ps.epa_rank, ps.ranked_teams),
+            ') and toughest on throws ', note_bucket(ph.bucket), ' (', note_yds(ph.yards_per_play), ' yards, ',
             note_epa(ph.epa_per_play), ', ', note_most(ph.epa_rank, ph.ranked_teams), ').') END,
           CASE WHEN ls.bucket <> lh.bucket THEN concat(
             'On 3rd & 7+ they''ve given up the most on throws ', note_bucket(ls.bucket), ' (', note_epa(ls.epa_per_play),
@@ -341,6 +357,14 @@ attack_dir AS (
 attack AS (
     SELECT m.season, m.week, m.team,
         concat(
+          CASE WHEN uo.team IS NOT NULL THEN concat(
+            'Our ', CASE WHEN uo.rush_rank <= 8 THEN 'strength is the run: we''re ' ELSE 'run game is ' END,
+            note_ord(uo.rush_rank), ' in rushing yards (', CAST(round(uo.rush_ypg) AS INTEGER), ' per game, ',
+            note_yds(uo.yards_per_carry), ' a carry), and they allow ', CAST(round(td.rush_ypg) AS INTEGER),
+            ' rushing yards per game (', note_most(td.rush_ypg_rank, td.teams), ' in the league) and ',
+            CAST(round(td.pass_ypg) AS INTEGER), ' passing (', note_most(td.pass_ypg_rank, td.teams), ').',
+            CASE WHEN uo.rush_rank <= 8 AND td.rush_ypg_rank >= td.teams - 7 THEN ' It''s strength on strength on the ground.'
+                 WHEN uo.rush_rank <= 8 AND td.rush_ypg_rank <= 10 THEN ' That''s a matchup to lean on.' END, ' ') END,
           CASE WHEN d.ed_run_rank <= 10 AND d.ed_pass_rank <= 10
                  THEN concat('The ', m.nick, ' defense is soft on early downs against both the run (', note_epa(d.ed_run),
                              ' EPA per run allowed, ', note_most(d.ed_run_rank, d.teams), ' in the league) and the pass (',
@@ -390,6 +414,8 @@ attack AS (
           '). Check early whether they''ve adjusted their coverage.') END AS li_position
     FROM matchups m
     JOIN dfn d USING (season, week, team)
+    LEFT JOIN yds uo ON uo.season = m.season AND uo.week = m.week AND uo.team = m.opponent AND uo.side = 'offense'
+    LEFT JOIN yds td ON td.season = m.season AND td.week = m.week AND td.team = m.team AND td.side = 'defense'
     LEFT JOIN pos ps ON ps.season = m.season AND ps.week = m.week AND ps.team = m.team AND ps.soft_pick = 1
     LEFT JOIN pos ph ON ph.season = m.season AND ph.week = m.week AND ph.team = m.team AND ph.hard_pick = 1
     LEFT JOIN top_target ot ON ot.season = m.season AND ot.as_of_week = m.week AND ot.team = m.opponent
@@ -422,6 +448,10 @@ paragraphs AS (
             ELSE concat('On early downs they are ', note_ord(f.ed_play_rank), ' at ', note_epa(f.ed_play), ' EPA per play: runs ',
                         note_ord(f.ed_run_rank), ' (', note_epa(f.ed_run), '), dropbacks ', note_ord(f.ed_pass_rank), ' (', note_epa(f.ed_pass), ').')
           END,
+          (SELECT concat(' They''re ', note_ord(y.rush_rank), ' in rushing yards (', CAST(y.rush_yards AS INTEGER), ', ',
+                         CAST(round(y.rush_ypg) AS INTEGER), ' per game at ', note_yds(y.yards_per_carry), ' a carry) and ',
+                         note_ord(y.pass_ypg_rank), ' in passing yards per game (', CAST(round(y.pass_ypg) AS INTEGER), ').')
+           FROM yds y WHERE y.season = f.season AND y.week = f.week AND y.team = f.team AND y.side = 'offense'),
           (SELECT ' ' || string_agg(sentence, ' ' ORDER BY move_no) FROM move_text mt
            WHERE mt.season = f.season AND mt.week = f.week AND mt.team = f.team AND mt.section = 'stop')
         ) AS p1,

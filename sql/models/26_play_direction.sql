@@ -17,6 +17,10 @@
 --
 -- epa_rank: offense 1 = best EPA per play to that bucket; defense 1 = allows
 -- the MOST. Ranks only count teams with 5+ plays in the bucket.
+--
+-- So one big play can't make a hot spot: epa_wo_best is EPA per play with the
+-- bucket's single best play taken out (rank_wo_best ranks on it), next to
+-- median yards, success rate and explosive rate (runs 10+, passes 20+ yards).
 
 CREATE OR REPLACE TABLE play_direction AS
 WITH plays AS (
@@ -83,7 +87,10 @@ totals AS (
            COUNT(*)                        AS plays,
            SUM(COALESCE(epa, 0))           AS sum_epa,
            SUM(COALESCE(is_success, 0))    AS successes,
-           SUM(COALESCE(yards_gained, 0))  AS yards
+           SUM(COALESCE(yards_gained, 0))  AS yards,
+           MAX(COALESCE(epa, 0))           AS best_epa,
+           MEDIAN(COALESCE(yards_gained, 0)) AS median_yards,
+           SUM(CASE WHEN yards_gained >= CASE WHEN play_type = 'run' THEN 10 ELSE 20 END THEN 1 ELSE 0 END) AS explosives
     FROM buckets
     GROUP BY ALL
 ),
@@ -101,6 +108,10 @@ SELECT
     sum_epa / plays                                                AS epa_per_play,
     successes * 1.0 / plays                                        AS success_rate,
     yards * 1.0 / plays                                            AS yards_per_play,
+    explosives * 1.0 / plays                                       AS explosive_rate,
+    CASE WHEN plays > 1 THEN (sum_epa - best_epa) / (plays - 1) END AS epa_wo_best,
+    SUM(successes) OVER lg * 1.0 / SUM(plays) OVER lg              AS league_success,
+    SUM(yards) OVER lg * 1.0 / SUM(plays) OVER lg                  AS league_yards,
     SUM(plays) OVER lg * 1.0
       / SUM(type_plays) OVER lg                                    AS league_share,
     SUM(sum_epa) OVER lg / SUM(plays) OVER lg                      AS league_epa,
@@ -108,6 +119,10 @@ SELECT
         RANK() OVER (PARTITION BY season, as_of_week, side, span, situation, play_type,
                                   bucket_type, bucket, plays >= 5
                      ORDER BY sum_epa / plays DESC) END            AS epa_rank,
+    CASE WHEN plays >= 5 THEN
+        RANK() OVER (PARTITION BY season, as_of_week, side, span, situation, play_type,
+                                  bucket_type, bucket, plays >= 5
+                     ORDER BY (sum_epa - best_epa) / (plays - 1) DESC) END AS rank_wo_best,
     COUNT(*) FILTER (WHERE plays >= 5) OVER lg                     AS ranked_teams
 FROM shared
 WINDOW lg AS (PARTITION BY season, as_of_week, side, span, situation, play_type,
