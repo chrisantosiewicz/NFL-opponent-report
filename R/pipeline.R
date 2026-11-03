@@ -16,7 +16,10 @@ PBP_COLUMNS <- c(
   "passer_id", "rusher_id", "receiver_id",
   # depth of the target, for the top-receiver model (deep = 20+ air yards),
   # and yards gained, for production allowed by position on defense
-  "air_yards", "yards_gained"
+  "air_yards", "yards_gained",
+  # where the play went: run lane (left/middle/right x end/tackle/guard) and
+  # pass area (left/middle/right x short/deep), for play_direction
+  "run_location", "run_gap", "pass_location", "pass_length"
 )
 
 # Side feeds for the trade check. Each has a fixed column list so a failed
