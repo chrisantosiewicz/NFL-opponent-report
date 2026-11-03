@@ -63,6 +63,10 @@ header.top { padding-block: 22px 8px; display: grid; gap: 4px; }
 .notes .note-h { font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase; margin: 12px 0 4px; }
 .notes p.draft { font-size: 12px; color: var(--warn); font-weight: 600; }
 .notes ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.notes .note-tabs { margin: 2px 0 10px; }
+.notes .note-tabs button { padding: 7px 18px; font-weight: 600; }
+.notes .note-panel { border: 1px solid var(--rule); border-radius: 8px; padding: 4px 14px 12px; background: var(--paper); }
+.notes .note-panel > .note-h:first-child { margin-top: 10px; }
 .shift-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .shift-list li { display: flex; justify-content: space-between; gap: 12px; }
 .delta { font-family: var(--mono); font-weight: 500; white-space: nowrap; }
@@ -151,7 +155,7 @@ footer a { color: inherit; }
   const MET_LABEL = Object.fromEntries(MET.map(m => [m[0], m[1]]));
   const MIN_N = 30;
   const embedded = window.SCOUT_DATA || null;
-  const state = { data: null, index: null, team: null, span: "season" };
+  const state = { data: null, index: null, team: null, span: "season", noteSide: "defense" };
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -244,6 +248,27 @@ footer a { color: inherit; }
     return html + (inList ? "</ul>" : "");
   }
 
+  // Split the notes into the defense half (stopping their offense) and the
+  // offense half (attacking their defense) by their "## " headings, so the box
+  // shows one at a time behind a Defense / Offense toggle.
+  function scoutingNotesHtml(text) {
+    const parts = { pre: [], defense: [], offense: [] };
+    let cur = "pre";
+    for (const ln of text.split(/\r?\n/)) {
+      const t = ln.trim();
+      if (/^## /.test(t)) cur = /attacking|on offense|our offense/i.test(t) ? "offense" : "defense";
+      parts[cur].push(ln);
+    }
+    const sides = ["defense", "offense"].filter(k => parts[k].some(l => l.trim()));
+    if (!sides.includes(state.noteSide)) state.noteSide = sides[0] || "defense";
+    const label = { defense: "Defense", offense: "Offense" };
+    const tabs = sides.length > 1
+      ? `<div class="seg note-tabs" role="group" aria-label="Notes side">${sides.map(k =>
+          `<button type="button" data-note-side="${k}" aria-pressed="${k === state.noteSide}">${label[k]}</button>`).join("")}</div>` : "";
+    return notesHtml(parts.pre.join("\n")) + tabs + sides.map(k =>
+      `<div class="note-panel" data-note-panel="${k}"${k === state.noteSide ? "" : " hidden"}>${notesHtml(parts[k].join("\n"))}</div>`).join("");
+  }
+
   async function loadNotes(slug) {
     if (embedded) return (window.SCOUT_NOTES || {})[slug] || null;
     try { const r = await fetch(`notes/${slug}.md`, { cache: "no-cache" }); return r.ok ? await r.text() : null; } catch { return null; }
@@ -305,7 +330,7 @@ footer a { color: inherit; }
           <p class="muted" style="margin:8px 0 0">Rule: top or bottom 4 of 32 on 30+ plays this season, one per situation.</p>
         </div>
         <div class="box ${notes ? "notes" : ""}">
-          ${notes ? `<h2>${generated ? "Draft notes" : "Staff notes"}</h2>${notesHtml(notes)}` : `<h2>Tendency shifts</h2>${
+          ${notes ? `<h2>Scouting Notes</h2>${scoutingNotesHtml(notes)}` : `<h2>Tendency shifts</h2>${
             sh.length ? `<ul class="shift-list">${sh.map(s => `<li><span>${esc(SIT_LABEL[s.sit])}, ${esc(MET_LABEL[s.met])}: ${fmt(s.s.value, s.met)} → ${fmt(s.l.value, s.met)} <span class="muted">(${s.l.n} plays)</span></span><span class="delta">${fmtDiff(s.d, s.met)}</span></li>`).join("")}</ul>`
             : `<p class="muted">${d.fallback ? "No games yet this season." : anyRow && anyRow.games <= 4 ? "Not enough games yet: the last 4 games are the whole season." : "No big changes in the last 4 games."}</p>`}
             <p class="muted" style="margin:8px 0 0">Shift: in the same six key numbers as the one-pager, last 4 games differ from the season by 5+ points (0.10 EPA) on 30+ plays.</p>`}
@@ -375,6 +400,13 @@ footer a { color: inherit; }
 
   $("team").addEventListener("change", e => setTeam(e.target.value));
   window.addEventListener("hashchange", () => { if (state.data) { const t = pickTeamFromHash(); if (t !== state.team) setTeam(t); } });
+  $("app").addEventListener("click", e => {
+    const b = e.target.closest("[data-note-side]");
+    if (!b) return;
+    state.noteSide = b.dataset.noteSide;
+    for (const x of document.querySelectorAll("[data-note-side]")) x.setAttribute("aria-pressed", x === b);
+    for (const p of document.querySelectorAll("[data-note-panel]")) p.hidden = p.dataset.notePanel !== state.noteSide;
+  });
   $("app").addEventListener("click", e => { const c = e.target.closest("circle.o"); if (c) { setTeam(c.dataset.team); window.scrollTo({ top: 0 }); } });
   for (const sp of ["season", "last4"]) $("span-" + sp).addEventListener("click", () => {
     state.span = sp;
