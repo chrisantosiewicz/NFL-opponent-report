@@ -84,6 +84,7 @@ header.top { padding-block: 22px 6px; display: grid; gap: 4px; }
 .meter i { position: absolute; inset: 0 auto 0 0; background: var(--good); border-radius: 4px; }
 .meter b { position: absolute; top: -3px; bottom: -3px; left: 50%; width: 1px; background: var(--muted); }
 .empty { padding: 40px 0; color: var(--muted); }
+.banner { background: var(--none-bg); border-radius: 6px; padding: 8px 12px; font-size: 13px; margin-top: 6px; }
 footer { color: var(--muted); font-size: 12px; padding-block: 8px 32px; }
 footer a { color: inherit; }
 [hidden] { display: none !important; }
@@ -172,12 +173,14 @@ footer a { color: inherit; }
     if (!rows.length) return "";
     return `<section class="box season" style="margin-bottom:16px">
       <h2>How each call has held up, ${state.data.season}</h2>
-      <p class="sub">Every team's notes, every graded game this season. Tendencies: how often the game showed it; half the time (the line) is a coin flip. Warnings: how often it went our way (we took it away, or the soft spot paid off).</p>
+      <p class="sub">Every team's notes, every graded game this season from Week 2 on. Tendencies: how often the game showed it; half the time (the line) is a coin flip. Warnings: how often it went our way (we took it away, or the soft spot paid off).</p>
       <table><thead><tr><th>Call</th><th class="num">Rate</th><th class="bar-cell"></th><th class="num">Graded</th></tr></thead><tbody>
       ${rows.map(r => { const p = r.correct / r.graded; return `<tr><td>${esc(r.call)}</td><td class="num">${Math.round(100 * p)}%</td>
         <td class="bar-cell"><div class="meter" role="img" aria-label="${Math.round(100 * p)}% right"><i style="width:${(100 * p).toFixed(1)}%"></i><b></b></div></td>
         <td class="num">${r.graded}</td></tr>`; }).join("")}
-      </tbody></table></section>`;
+      </tbody></table>
+      ${state.data.week1_summary && state.data.week1_summary.graded ? `<p class="sub" style="margin:10px 0 0">Not in these rates: Week 1, scouted from last season, went our way on ${Math.round(100 * state.data.week1_summary.correct / state.data.week1_summary.graded)}% of ${state.data.week1_summary.graded} graded calls.</p>` : ""}
+      </section>`;
   }
 
   async function exists(url) {
@@ -214,7 +217,10 @@ footer a { color: inherit; }
       <header class="top">
         <div class="team-name">${esc(info.name)} offense</div>
         <div class="result">${esc(resultLine(g))}</div>
-        <div class="muted">Scouted for the ${esc(opp.nick)}. The calls used games before Week ${week}; the grades use this game only.</div>
+        <div class="muted">Scouted for the ${esc(opp.nick)}. ${g.basis === "last_season"
+          ? `Week 1 calls come from last season's full regular season, since no games had been played yet; the grades use this game only.`
+          : `The calls used games before Week ${week}; the grades use this game only.`}</div>
+        ${g.basis === "last_season" ? `<div class="banner">Week 1: scouted from last season. Offseason roster and coaching changes aren't in these numbers, so these grades are kept out of the season rates below.</div>` : ""}
         <div class="quick">
           ${hasWeek ? `<a href="scout.html?week=${encodeURIComponent(weekFile)}#${esc(team)}">Open the full scouting page for this week</a>` : ""}
           ${hasNotes ? `<a href="notes/${esc(slug)}.md">Staff notes</a>` : ""}

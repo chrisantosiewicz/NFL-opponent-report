@@ -14,9 +14,21 @@
 -- Mixed = yards and EPA disagree (run lanes).
 -- Didn't come up = too few plays in the game to say (thresholds below).
 -- Calls with no clear lean that week are left out, as they are in the notes.
+-- Week 1 is scouted from last season's full regular season (basis =
+-- 'last_season'), so its grades are kept apart from the in-season rates.
 
 CREATE OR REPLACE TABLE report_card AS
-WITH m AS (
+WITH
+    -- Week 1 reads last season's full year (27_week1_carryover.sql)
+    tendency_ranks      AS (FROM with_week1('main.tendency_ranks')),
+    formation_tells     AS (FROM with_week1('main.formation_tells')),
+    top_target          AS (FROM with_week1('main.top_target')),
+    defense_splits      AS (FROM with_week1('main.defense_splits')),
+    defense_vs_position AS (FROM with_week1('main.defense_vs_position')),
+    team_yards          AS (FROM with_week1('main.team_yards')),
+    play_direction      AS (FROM with_week1('main.play_direction')),
+    score_splits        AS (FROM with_week1('main.score_splits')),
+m AS (
     SELECT g.season, g.week, g.team, g.opponent, g.game_id, g.gameday, g.is_home,
            g.team_score, g.opponent_score
     FROM stg_team_games g
@@ -296,6 +308,7 @@ calls AS (
 )
 
 SELECT m.season, m.week, m.team, m.opponent, m.gameday, m.is_home, m.team_score, m.opponent_score,
+       CASE WHEN m.week = 1 THEN 'last_season' ELSE 'in_season' END AS basis,   -- Week 1 is scouted from last season
        c.call_no, c.side, c.kind, c.call, c.said, c.happened, c.verdict
 FROM calls c
 JOIN m USING (season, week, team);

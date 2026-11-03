@@ -24,4 +24,11 @@ WHERE r.call_no = 8
 UNION ALL
 SELECT season, week, team, CAST(call_no AS VARCHAR), text
 FROM (SELECT *, said || ' | ' || happened AS text FROM report_card)
-WHERE regexp_matches(text, '\(\s*of|of\s*\)|  |\(\)| ,|NaN|^\s|\s$');
+WHERE regexp_matches(text, '\(\s*of|of\s*\)|  |\(\)| ,|NaN|^\s|\s$')
+UNION ALL
+-- Week 1 is graded too (scouted from last season) whenever last season is loaded.
+SELECT g.season, g.week, g.team, 'week 1', 'week 1 not graded'
+FROM stg_team_games g
+WHERE g.week = 1 AND g.is_complete AND g.game_type = 'REG'
+  AND EXISTS (SELECT 1 FROM tendency_ranks t WHERE t.season = g.season - 1)
+  AND NOT EXISTS (SELECT 1 FROM report_card r WHERE r.season = g.season AND r.week = 1 AND r.team = g.team);

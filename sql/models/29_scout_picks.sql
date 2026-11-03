@@ -19,7 +19,7 @@ WITH d AS (
            plays, type_plays, share, league_share, share - league_share AS lean,
            yards_per_play, success_rate, league_success, epa_per_play, league_epa,
            epa_wo_best, rank_wo_best, epa_rank, ranked_teams
-    FROM play_direction
+    FROM with_week1('main.play_direction')   -- Week 1 picks come from last season
     WHERE span = 'season'
 ),
 

@@ -63,7 +63,17 @@ CREATE OR REPLACE MACRO note_dsit(s) AS CASE s
     WHEN 'third_long' THEN 'On 3rd & 7+' WHEN 'red_zone' THEN 'In the red zone' ELSE s END;
 
 CREATE OR REPLACE TABLE draft_notes AS
-WITH matchups AS (
+WITH
+    -- Week 1 reads last season's full year (27_week1_carryover.sql)
+    tendency_ranks      AS (FROM with_week1('main.tendency_ranks')),
+    formation_tells     AS (FROM with_week1('main.formation_tells')),
+    top_target          AS (FROM with_week1('main.top_target')),
+    defense_splits      AS (FROM with_week1('main.defense_splits')),
+    defense_vs_position AS (FROM with_week1('main.defense_vs_position')),
+    team_yards          AS (FROM with_week1('main.team_yards')),
+    play_direction      AS (FROM with_week1('main.play_direction')),
+    score_splits        AS (FROM with_week1('main.score_splits')),
+matchups AS (
     SELECT g.season, g.week, g.team, g.opponent, g.gameday,
            t.team_nick AS nick, o.team_nick AS opp_nick
     FROM stg_team_games g
@@ -525,7 +535,12 @@ paragraphs AS (
 ),
 
 lines AS (
-    SELECT season, week, team, 10 AS line, 'h' AS kind, 'Stopping their offense' AS text FROM paragraphs
+    SELECT season, week, team, 9 AS line, 'p' AS kind,
+           concat('Week 1: every number here is from last season''s full regular season, so offseason changes aren''t in it.',
+                  (SELECT ' Coaching changes: ' || string_agg(c.role || ' ' || c.name || COALESCE(' (' || c.note || ')', ''), '; ') || '.'
+                   FROM coaching_changes c WHERE c.season = mw.season AND c.team = mw.team)) AS text
+    FROM matchups mw WHERE week = 1
+    UNION ALL SELECT season, week, team, 10, 'h', 'Stopping their offense' FROM paragraphs
     UNION ALL SELECT season, week, team, 11, 'p', p1 FROM paragraphs
     UNION ALL SELECT season, week, team, 12, 'p', p2 FROM paragraphs WHERE p2 IS NOT NULL
     UNION ALL SELECT season, week, team, 13, 'p', p3 FROM paragraphs
