@@ -21,4 +21,4 @@ Updated: 2026-10-26 (v1 pipeline built by Claude at Chris's request; ratings mov
 | Week | Dates | Skills practiced | Rating changes | Evidence |
 |------|-------|------------------|----------------|----------|
 | 0 (kickoff) | Oct 25 | — | Baselines pending | This file |
-| 0 (v1 build) | Oct 26 | All (reading) | None: Claude wrote v1 at Chris's request | `docs/walkthrough.md`: exercises ✍️ per skill. Rewrites committed by Chris count as evidence. |
+| 0 (v1 build) | Oct 26 | All (reading) | None: Claude wrote v1 at Chris's request | [walkthrough.md](walkthrough.md): exercises ✍️ per skill. Rewrites committed by Chris count as evidence. |

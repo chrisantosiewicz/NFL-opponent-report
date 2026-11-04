@@ -1,0 +1,18 @@
+# sql/export - JSON for the live and archive pages
+
+One job: write what `site/scout.html` and `site/archive.html` fetch.
+
+## Inputs
+- Working (this run): tables from `../models/`
+- Reference (every run): `R/pipeline.R` `run_sql_template()` fills the `{{placeholders}}`
+
+## Process
+1. `site_week.sql`: all 32 teams for one week -> `site/data/<season>-week<NN>.json`.
+2. `site_index.sql`: the weeks on disk, newest first -> `site/data/index.json`.
+3. `site_report_cards.sql`: every graded matchup -> `site/data/report-cards-<season>.json`.
+
+## Outputs
+- `site/data/*.json`
+
+## Check
+Open `site/scout.html` locally and switch to the new week: every team loads with no console errors.
