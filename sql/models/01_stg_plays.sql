@@ -38,6 +38,15 @@ SELECT
     xpass,
     epa,
     CAST(success AS INTEGER)       AS is_success,
+    passer_id,                     -- gsis ids, for the trade check
+    rusher_id,
+    receiver_id,
+    air_yards,                     -- for deep targets in receiver_targets
+    yards_gained,                  -- for production allowed by position
+    run_location,                  -- left / middle / right (runs, incl. scrambles)
+    run_gap,                       -- end / tackle / guard; NULL when middle
+    pass_location,                 -- left / middle / right (aimed passes only)
+    pass_length,                   -- short / deep (deep = 15+ air yards)
 
     -- Situation flags
     down IN (1, 2)                 AS is_early_down,

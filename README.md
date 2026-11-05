@@ -29,9 +29,22 @@ Needs R, Quarto, and the packages in `DESCRIPTION` (pinned in `renv.lock`: run `
 | Snapshot | `sql/models/12_tendency_snapshot.sql` | what was known before each week (as-of join; no leakage) |
 | Ranks | `sql/models/13_tendency_ranks.sql`, `14_last_season_ranks.sql` | metric values, n, league rank, percentile; last season's ranks |
 | "3 things" | `sql/models/15_three_things.sql` | top/bottom 10% on 30+ plays, one per situation |
+| Trade check | `sql/models/04_team_alias.sql` … `06_stg_trades.sql`, `16_trade_impact.sql`, `17_trade_feed_status.sql`; `R/pipeline.R` `check_trades()` | every player who joined or left a team in-season, his usage before the move, games since; warnings in the run log; "Roster changes" box on the report |
 | Tests | `sql/tests/*.sql` | each must return zero rows, or the run stops |
+| Live data | `sql/export/site_week.sql`, `site_index.sql` via `export_site_data()` | `site/data/<season>-week<NN>.json` (all 32 teams) + `index.json` |
 | Report | `report/opponent_report.qmd` | `site/reports/<season>-week<NN>-<OPP>.html` / `.pdf` |
 | Site | `R/pipeline.R` `build_site()` | `site/index.html`: latest report + archive |
+| Top target | `sql/models/18_game_windows.sql`, `19_receiver_targets.sql`, `20_top_target.sql` | who gets the ball, season vs last 4, the situations where he gets it most |
+| Formation tells | `sql/models/21_formation_tells.sql` | early-down run/pass rate under center and in shotgun, vs the league |
+| Defense splits | `sql/models/23_defense_splits.sql` | EPA, success rate and yards each defense allows on runs vs dropbacks by situation (early down, 3rd & short/medium/long, red zone), season and last 4, with league rank |
+| Defense vs position | `sql/models/24_defense_vs_position.sql` | EPA per target and yards per game each defense allows to WRs, TEs and RBs, with league rank |
+| Team yards | `sql/models/25_team_yards.sql` | rushing and passing yards per game (and per carry / dropback) for every offense and allowed by every defense, with league ranks |
+| Play direction | `sql/models/26_play_direction.sql` | where each offense runs (inside / off tackle / around end, left / middle / right) and throws (short / deep x left / middle / right), and where each defense gets run and thrown on, by down and distance, with league share, yards, success rate, explosive rate, EPA and rank, plus EPA with the single best play removed |
+| Score splits | `sql/models/28_score_splits.sql` | late-half, 3rd-down, red-zone and overall results by score state (trailing 9+, 1-8, tied, leading 1-8, 9+, plus tied-or-trailing and leading), with median EPA and EPA without the best play |
+| Scout picks | `sql/models/29_scout_picks.sql` | the spots the notes call out (hot throw area, with "outside the hashes" when both sides qualify; run lean; softest and toughest run lanes), chosen once so the notes and report card grade the same thing |
+| Draft notes | `sql/models/30_draft_notes.sql` via `write_draft_notes()` | a narrative for every matchup in two halves (stopping their offense, attacking their defense) plus "what to look for" on each side, from tendencies, top target, defensive splits, position matchups, run lanes and pass areas and roster moves; `site/notes/drafts/<slug>.md` |
+| Report card | `sql/models/31_report_card.sql` | after each game, every call the notes made, in one line, next to what happened and a verdict (Hit / Miss / Mixed for tendencies; Called it / Held for threats on defense, Hit / Miss for soft spots on offense; Didn't come up) |
+| Live page | `site/scout.html` | interactive scout: any team, season or last 4, 32-team strips; staff notes from `site/notes/` |
 | Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, publish to Pages |
 
 If any step fails in GitHub Actions, nothing is published, so the last good report stays live and GitHub emails the failure.
@@ -54,7 +67,18 @@ If the Bears have no game left, the pipeline scouts both teams in every game of 
 | Last-season ranks | Full-season 2025 league rank shown next to each 2026 rank where applicable, with a caveat when the opponent changed play callers. |
 | Leakage | A report for week N uses only games before week N. |
 | "3 things to know" | A metric in the league's top or bottom 10% with at least 30 plays. |
+| In-season move | A player who changed teams from the season's first game on (offseason trades excluded). Sources: nflverse trade feed, `config/trades_manual.csv`, and weekly rosters (53-man or reserve list one week, another team's the next). |
+| Regular (⚠) | Before the move, with the old team: 50%+ of dropbacks, 15%+ of targets, 30%+ of carries, or 60%+ of offensive or defensive snaps. |
+
+## Trades during the season
+
+nflverse's trade feed can lag by months (on Oct 30, 2026 its newest trade was from April), so the check has two other sources:
+
+1. **`config/trades_manual.csv`**: add a row per player when a trade happens (date, from, to, name, position; PFR id optional). Picks go in `notes`. Once nflverse publishes the trade, the manual row is ignored automatically.
+2. **Weekly rosters**: a player who shows up on a new team's roster is caught even if nobody typed the trade in. The run log then says "Seen in weekly rosters but not in any trade list", which is your cue to add it to the CSV (or ignore it if it was a waiver claim).
+
+Every run prints each move involving the Bears or the opponent, and a GitHub Actions warning when one of the opponent's regulars moved. The report shows the same moves in a "Roster changes" box above "3 things to know" and says how many of the opponent's games came before the move.
 
 ## Data credit
 
-Play-by-play and schedule data from [nflverse](https://github.com/nflverse) (nflreadr / nflfastR), used under its open license.
+Play-by-play, schedule, trade, roster and snap-count data from [nflverse](https://github.com/nflverse) (nflreadr / nflfastR), used under its open license.
