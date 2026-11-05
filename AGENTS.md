@@ -16,7 +16,6 @@ Start here, then read at most one `CONTEXT.md`. The pipeline in one screen: [CON
 | `sql/export/` | JSON for the live page: [contract](sql/export/CONTEXT.md) |
 | `report/` | the Quarto one-pager: [contract](report/CONTEXT.md) |
 | `site/` | what GitHub Pages serves: [contract](site/CONTEXT.md); staff notes: [contract](site/notes/CONTEXT.md) |
-| `learning/` | Chris's skill tracker, progress log and walkthrough: [contract](learning/CONTEXT.md) |
 | `_tools/` | `links.py` checks every link and input path in the docs |
 | `.github/workflows/` | Tuesday run, Wednesday retry, publish to Pages |
 
@@ -31,7 +30,6 @@ Start here, then read at most one `CONTEXT.md`. The pipeline in one screen: [CON
 | changing the one-pager | [report/CONTEXT.md](report/CONTEXT.md) |
 | changing the live or archive page | [site/CONTEXT.md](site/CONTEXT.md) |
 | publishing this week's staff notes | [site/notes/CONTEXT.md](site/notes/CONTEXT.md) |
-| logging work or updating a skill rating | [learning/CONTEXT.md](learning/CONTEXT.md) |
 | asked for status | newest `site/reports/*.html`, `site/notes/` vs `site/notes/drafts/`, the last Actions run |
 
 ## The one rule
