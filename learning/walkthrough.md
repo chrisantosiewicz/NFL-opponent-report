@@ -4,7 +4,7 @@ Written Oct 26, 2026, after the first full build. Read it with the code open.
 
 **Read this first: who wrote what.** You asked me to build v1 of everything, including the SQL models. That's fine, but it changes what you can claim. The resume line says *you* built it, and in an interview you have to walk through every line. So each section ends with **exercises**. The ones marked ✍️ are "close the file and rebuild it from memory". Commit your rewrites under your name. When the git history shows your versions of the key queries, the resume line is honest. Until then it isn't, and I'll keep flagging that.
 
-Each section names the skill it builds (numbers match `Skill Tracker.md`).
+Each section names the skill it builds (numbers match [skill-tracker.md](skill-tracker.md)).
 
 ---
 
@@ -28,7 +28,7 @@ nflreadr (R)  ──►  raw_* tables in data/nfl.duckdb
           GitHub Actions: Tue 14:00 UTC, Wed retry  ─►  GitHub Pages
 ```
 
-One command does it all: `Rscript run_pipeline.R`. Every design rule (play filter, buckets, the 5–95% window) is in the README's Definitions table, and in exactly one place in the code (`01_stg_plays.sql` and `10_team_game_tendencies.sql`).
+One command does it all: `Rscript run_pipeline.R`. Every design rule (play filter, buckets, the 5–95% window) is in [_shared/definitions.md](../_shared/definitions.md), and in exactly one place in the code (`01_stg_plays.sql` and `10_team_game_tendencies.sql`).
 
 Design rules that run through the whole build:
 1. **R moves data, SQL holds the logic.** `load_raw_data()` doesn't transform anything. If you want to change a definition, it's a SQL change.

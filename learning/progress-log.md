@@ -13,7 +13,7 @@
 - Built: SQL models (staging, tendencies, rolling, snapshot, ranks, last-season ranks, "3 things"), 10 data tests, R pipeline (`run_pipeline.R`), Quarto one-pager, landing page + archive, GitHub Actions weekly workflow and renv lockfile workflow.
 - Verified on real nflverse data (2024–2026 through Week 7): all models build, all 10 tests pass; the leakage test fails when the `<` guard is changed to `<=`.
 - League 3rd-down shotgun rate: ~98% on 3rd & 7+, ~97% on 3rd & 4–6, 62–70% on 3rd & 1–3 (to compare with the thesis).
-- Next for Chris: setup steps at the end of `docs/walkthrough.md` (Pages, renv lock, first manual run), then the ✍️ exercises.
+- Next for Chris: setup steps at the end of `docs/walkthrough.md` (now [walkthrough.md](walkthrough.md)) (Pages, renv lock, first manual run), then the ✍️ exercises.
 
 ## 2026-10-28: Live page (Claude, at Chris's request)
 - Added `export_site_data()`: one DuckDB `COPY` per week writes every team's ranks to `site/data/<season>-week<NN>.json`, after the data tests.
