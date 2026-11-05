@@ -163,14 +163,18 @@ find_next_week_matchups <- function(con, on_date = Sys.Date()) {
     ORDER BY g.gameday, g.game_id, g.is_home", params = list(as.Date(on_date)))
 }
 
-# Fill {{name}} placeholders in a .sql file and run it. Values are integers or
-# team abbreviations checked by the caller, never free text.
+# Fill {{name}} placeholders in a .sql file and run it. Values are integers,
+# team abbreviations checked by the caller, or strings built here, never free text.
 run_sql_template <- function(con, file, ...) {
   sql <- paste(readLines(file, warn = FALSE), collapse = "\n")
   vals <- list(...)
   for (k in names(vals)) sql <- gsub(paste0("{{", k, "}}"), vals[[k]], sql, fixed = TRUE)
   dbExecute(con, sql)
 }
+
+# "Updated" stamp for the JSON exports, made in R rather than SQL: DuckDB's
+# timestamp formatting failed to bind in CI (first Actions run, Nov 5, 2026).
+updated_stamp <- function() format(Sys.time(), "%Y-%m-%d %H:%M UTC", tz = "UTC")
 
 # Data for the live page (site/scout.html): one JSON file per report week with
 # every team's numbers, plus data/index.json listing the weeks on disk. Runs
@@ -182,7 +186,7 @@ export_site_data <- function(con, season, week, focal_team, site_dir = "site") {
   path <- file.path(normalizePath(data_dir), sprintf("%d-week%02d.json", as.integer(season), as.integer(week)))
   run_sql_template(con, "sql/export/site_week.sql",
                    season = as.integer(season), week = as.integer(week),
-                   focal_team = focal_team, path = path)
+                   focal_team = focal_team, path = path, updated = updated_stamp())
   run_sql_template(con, "sql/export/site_index.sql", dir = normalizePath(data_dir))
   message("exported ", path)
   invisible(path)
@@ -194,7 +198,8 @@ export_report_cards <- function(con, season, site_dir = "site") {
   data_dir <- file.path(site_dir, "data")
   dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
   path <- file.path(normalizePath(data_dir), sprintf("report-cards-%d.json", as.integer(season)))
-  run_sql_template(con, "sql/export/site_report_cards.sql", season = as.integer(season), path = path)
+  run_sql_template(con, "sql/export/site_report_cards.sql", season = as.integer(season), path = path,
+                   updated = updated_stamp())
   message("exported ", path)
   invisible(path)
 }

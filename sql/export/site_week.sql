@@ -13,7 +13,7 @@ COPY (
         (SELECT opponent FROM stg_team_games
          WHERE season = {{season}} AND week = {{week}}
            AND team = '{{focal_team}}')                   AS focal_opponent,
-        strftime(now() AT TIME ZONE 'UTC', '%Y-%m-%d %H:%M UTC') AS updated,
+        '{{updated}}'                                     AS updated,
 
         (SELECT list({team: team, name: team_name, nick: team_nick,
                       color: color_primary, color2: color_secondary}
@@ -22,7 +22,7 @@ COPY (
 
         -- Both rows of every game this week (team's view of the matchup).
         (SELECT list({team: team, opponent: opponent, is_home: is_home,
-                      gameday: strftime(gameday, '%Y-%m-%d')}
+                      gameday: CAST(gameday AS VARCHAR)}
                      ORDER BY gameday, game_id, is_home DESC)
          FROM stg_team_games
          WHERE season = {{season}} AND week = {{week}})   AS games,

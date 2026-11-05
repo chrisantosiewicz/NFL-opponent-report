@@ -6,12 +6,12 @@
 COPY (
     SELECT
         {{season}} AS season,
-        strftime(now() AT TIME ZONE 'UTC', '%Y-%m-%d %H:%M UTC') AS updated,
+        '{{updated}}'                                     AS updated,
         (SELECT list({team: team, name: team_name, nick: team_nick, color: color_primary} ORDER BY team)
          FROM dim_team) AS teams,
         (SELECT list(g ORDER BY g.week DESC, g.team)
          FROM (SELECT {week: week, team: team, opponent: opponent,
-                       gameday: strftime(gameday, '%Y-%m-%d'), is_home: is_home,
+                       gameday: CAST(gameday AS VARCHAR), is_home: is_home,
                        team_score: team_score, opponent_score: opponent_score,
                        basis: basis,
                       calls: list({n: call_no, side: side, kind: kind, call: call,
