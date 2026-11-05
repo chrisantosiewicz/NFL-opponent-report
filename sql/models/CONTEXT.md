@@ -7,7 +7,7 @@ One job: every table the report, live page and notes read, as plain SQL.
 - Reference (every run): `../../_shared/definitions.md`
 - Reference (every run): `../../config/trades_manual.csv`, `../../config/coaching_changes_manual.csv`
 
-Do NOT load: `site/reports/`, `site/data/`, `learning/`.
+Do NOT load: `site/reports/`, `site/data/`.
 
 ## Process
 1. Files run in file-name order (`build_models()`); a model may only read lower-numbered models.
