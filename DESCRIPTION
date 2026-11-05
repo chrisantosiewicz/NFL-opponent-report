@@ -1,0 +1,14 @@
+Package: nflopponentreport
+Title: Automated Weekly NFL Opponent Tendency Report
+Version: 0.1.0
+Description: Not an R package. This file lists the R packages the pipeline
+    needs, so renv can pin them (renv::snapshot(type = "explicit")).
+License: MIT
+Imports:
+    DBI,
+    duckdb,
+    ggplot2,
+    knitr,
+    nflreadr,
+    rmarkdown,
+    scales

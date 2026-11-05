@@ -1,0 +1,9 @@
+# Built locally or in CI; never committed
+data/
+report/*.html
+report/*_files/
+report/.quarto/
+.quarto/
+.Rproj.user/
+.Rhistory
+.RData

@@ -1,0 +1,295 @@
+---
+pagetitle: "Opponent tendency report"
+format:
+  html:
+    embed-resources: true
+    css: report.css
+    page-layout: custom
+    minimal: true
+execute:
+  echo: false
+  warning: false
+  message: false
+params:
+  opponent: "SEA"
+  focal_team: "CHI"
+  season: 2026
+  week: 8
+  gameday: "2026-11-02"
+  is_home: false
+  db_path: "../data/nfl.duckdb"
+---
+
+```{r setup}
+library(DBI)
+library(ggplot2)
+source("helpers.R")
+
+opp_team <- params$opponent
+season   <- as.integer(params$season)
+week     <- as.integer(params$week)
+
+con <- dbConnect(duckdb::duckdb(), dbdir = params$db_path, read_only = TRUE)
+
+teams <- dbGetQuery(con, "SELECT * FROM dim_team")
+opp_name   <- teams$team_name[teams$team == opp_team]
+focal_name <- teams$team_nick[teams$team == params$focal_team]
+opp_color  <- teams$color_primary[teams$team == opp_team]
+
+# Everything known before this week, for every team (league context).
+league <- dbGetQuery(con, "
+  SELECT * FROM tendency_ranks
+  WHERE season = ? AND as_of_week = ?", params = list(season, week))
+
+last_season <- dbGetQuery(con, "
+  SELECT team, situation, metric, value, n, league_rank, league_teams
+  FROM last_season_ranks
+  WHERE season = ? AND team = ?", params = list(season - 1L, opp_team))
+
+things <- dbGetQuery(con, "
+  SELECT * FROM three_things
+  WHERE season = ? AND as_of_week = ? AND team = ? AND priority <= 3
+  ORDER BY priority", params = list(season, week, opp_team))
+
+has_current <- any(league$team == opp_team)
+if (!has_current) {
+  # Week 1: nothing known this season yet, so show last season's full numbers.
+  league <- dbGetQuery(con, "SELECT * FROM last_season_ranks WHERE season = ?",
+                       params = list(season - 1L))
+  things <- dbGetQuery(con, "
+    SELECT t.* FROM three_things t
+    JOIN (SELECT DISTINCT season, as_of_week FROM last_season_ranks) l
+      ON l.season = t.season AND l.as_of_week = t.as_of_week
+    WHERE t.season = ? AND t.team = ? AND t.priority <= 3
+    ORDER BY t.priority", params = list(season - 1L, opp_team))
+}
+
+dbDisconnect(con, shutdown = TRUE)
+
+opp <- league[league$team == opp_team, ]
+season_rows <- opp[opp$span == "season", ]
+games_played <- if (has_current) max(season_rows$games) else 0L
+through_week <- if (has_current) max(season_rows$through_week) else NA
+
+# Look up one number (value / n / rank) for the opponent.
+pick <- function(sit, met, span = "season", data = opp) {
+  data[data$situation == sit & data$metric == met & data$span == span, ][1, ]
+}
+pick_last <- function(sit, met) {
+  last_season[last_season$situation == sit & last_season$metric == met, ][1, ]
+}
+
+# A table row: metric, this season (value, rank), last season rank, n.
+# In the Week 1 fallback the main numbers already are last season's, so the
+# "Last season" column is dropped.
+metric_row <- function(sit, met) {
+  cur <- pick(sit, met)
+  prev <- pick_last(sit, met)
+  row <- data.frame(
+    Metric = METRIC_LABELS[[met]],
+    Value = fmt_value(cur$value, met),
+    `NFL rank` = fmt_rank(cur$league_rank, cur$league_teams),
+    `League avg` = fmt_value(cur$league_avg, met),
+    `Last season` = ifelse(is.na(prev$league_rank), "–",
+                           paste0(fmt_value(prev$value, met), " (", ordinal(prev$league_rank), ")")),
+    Plays = fmt_n(cur$n),
+    check.names = FALSE
+  )
+  if (!has_current) row$`Last season` <- NULL
+  row
+}
+
+html_table <- function(df) {
+  knitr::kable(df, format = "html", escape = FALSE, row.names = FALSE,
+               table.attr = 'class="report-table"')
+}
+
+opp_nick <- teams$team_nick[teams$team == opp_team]
+matchup <- if (isTRUE(as.logical(params$is_home))) paste(opp_nick, "at", focal_name) else paste(focal_name, "at", opp_nick)
+game_date <- format(as.Date(params$gameday), "%a %b %e, %Y")
+```
+
+::: {.report style="--team-color: `r opp_color`;"}
+
+::: {.header}
+[`r opp_name` offense]{.team}
+[Scouting report for the `r focal_name` · `r season` Week `r week` · `r matchup`, `r game_date`]{.sub}
+[`r if (has_current) sprintf("Data through Week %d (%d games). Only games before this week are used. Ranks are among all 32 teams.", through_week, games_played) else sprintf("No %d games yet: figures below are from the %d season.", season, season - 1)`]{.asof}
+:::
+
+::: {.things}
+### 3 things to know
+
+```{r three-things, results="asis"}
+if (nrow(things) == 0) {
+  cat("<p>Nothing stands out yet: no tendency is in the top or bottom 10% of the league on at least 30 plays.</p>")
+} else {
+  cat("<ol>", paste0("<li>", vapply(seq_len(nrow(things)), function(i) three_things_sentence(things[i, ]), ""), "</li>", collapse = ""), "</ol>")
+}
+```
+:::
+
+::: {.grid}
+
+::: {.panel}
+```{r early-title, results="asis"}
+ed <- pick("early_down", "proe")
+title <- if (is.na(ed$pctile)) "Early downs" else if (ed$pctile >= 0.75) {
+  "Early downs: pass-first, throws more than the situation calls for"
+} else if (ed$pctile <= 0.25) {
+  "Early downs: run-first, runs more than the situation calls for"
+} else "Early downs: close to the league's expected pass rate"
+cat("### ", title, "\n")
+```
+```{r early-table, results="asis"}
+html_table(rbind(metric_row("early_down", "pass_rate"),
+                 metric_row("early_down", "proe"),
+                 metric_row("early_down", "shotgun_rate"),
+                 metric_row("early_down", "epa_play")))
+```
+:::
+
+::: {.panel}
+```{r third-title, results="asis"}
+third <- c("third_short", "third_medium", "third_long")
+# Headline the most unusual 3rd-down pass rate that has a real sample.
+tp <- do.call(rbind, lapply(third, function(s) pick(s, "pass_rate")))
+tp <- tp[!is.na(tp$value) & tp$n >= MIN_N, ]
+t1 <- if (nrow(tp) > 0) tp[which.max(abs(tp$pctile - 0.5)), ] else NULL
+title <- if (is.null(t1)) "3rd down by distance (samples still small)" else
+  if (abs(t1$pctile - 0.5) < 0.25) "3rd down: pass rates in line with the league at every distance" else {
+  sprintf("%s: they throw %s of the time (league %s, %s)",
+          SITUATION_LABELS[[t1$situation]], fmt_value(t1$value, "pass_rate"),
+          fmt_value(t1$league_avg, "pass_rate"), rank_phrase(t1$league_rank, t1$league_teams, "pass_rate"))
+}
+cat("### ", title, "\n")
+```
+```{r third-chart, fig.width=3.7, fig.height=1.5}
+d <- do.call(rbind, lapply(third, function(s) do.call(rbind, lapply(c("pass_rate", "shotgun_rate"), function(m) {
+  r <- pick(s, m)
+  data.frame(situation = SITUATION_LABELS[[s]], metric = METRIC_LABELS[[m]],
+             value = r$value, league_avg = r$league_avg, n = r$n)
+}))))
+d$situation <- factor(d$situation, levels = rev(SITUATION_LABELS[third]))
+ggplot(d, aes(y = situation)) +
+  geom_segment(aes(x = league_avg, xend = value, yend = situation), colour = "grey70") +
+  geom_point(aes(x = league_avg), shape = 124, size = 3, colour = "grey40") +
+  geom_point(aes(x = value), size = 2.2, colour = opp_color) +
+  facet_wrap(~metric, nrow = 1) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 1), breaks = c(0, 0.5, 1)) +
+  labs(x = "Dot = them, tick = league average", y = NULL) +
+  theme_report()
+```
+```{r third-table, results="asis"}
+html_table(do.call(rbind, lapply(third, function(s) {
+  p <- pick(s, "pass_rate"); e <- pick(s, "epa_play")
+  data.frame(Distance = SITUATION_LABELS[[s]],
+             `Pass rate` = paste0(fmt_value(p$value, "pass_rate"), " (", ordinal(p$league_rank), ")"),
+             `EPA/play` = paste0(fmt_value(e$value, "epa_play"), " (", ordinal(e$league_rank), ")"),
+             Plays = fmt_n(p$n), check.names = FALSE)
+})))
+```
+:::
+
+::: {.panel}
+```{r rz-title, results="asis"}
+rz <- pick("red_zone", "pass_rate")
+title <- if (is.na(rz$pctile)) "Red zone" else if (rz$pctile >= 0.75) {
+  sprintf("Red zone: throw-first (%s pass rate)", fmt_value(rz$value, "pass_rate"))
+} else if (rz$pctile <= 0.25) {
+  sprintf("Red zone: run-first (%s pass rate)", fmt_value(rz$value, "pass_rate"))
+} else sprintf("Red zone: balanced (%s pass rate)", fmt_value(rz$value, "pass_rate"))
+cat("### ", title, "\n")
+```
+```{r rz-table, results="asis"}
+html_table(rbind(metric_row("red_zone", "pass_rate"),
+                 metric_row("red_zone", "proe"),
+                 metric_row("red_zone", "epa_play")))
+```
+:::
+
+::: {.panel}
+```{r shifts, results="asis"}
+watch <- data.frame(
+  situation = c("early_down", "early_down", "early_down", "third_short", "red_zone", "all_neutral"),
+  metric    = c("proe", "shotgun_rate", "epa_play", "pass_rate", "pass_rate", "epa_play")
+)
+shifts <- do.call(rbind, lapply(seq_len(nrow(watch)), function(i) {
+  s <- pick(watch$situation[i], watch$metric[i], "season")
+  l <- pick(watch$situation[i], watch$metric[i], "last4")
+  data.frame(situation = watch$situation[i], metric = watch$metric[i],
+             season = s$value, last4 = l$value, n_last4 = l$n, games_last4 = l$games)
+}))
+shifts$diff <- shifts$last4 - shifts$season
+shifts$flag <- !is.na(shifts$diff) & abs(shifts$diff) >= shift_threshold(shifts$metric) &
+               shifts$n_last4 >= MIN_N
+n_flags <- sum(shifts$flag)
+title <- if (games_played <= 4) {
+  "Tendency shifts: not enough games yet (last 4 = whole season)"
+} else if (n_flags == 0) {
+  "Tendency shifts: no big changes in the last 4 games"
+} else sprintf("Tendency shifts: %d change%s in the last 4 games", n_flags, if (n_flags > 1) "s" else "")
+cat("### ", title, "\n")
+if (games_played > 4) {
+  tab <- data.frame(
+    Situation = SITUATION_LABELS[shifts$situation],
+    Metric = METRIC_LABELS[shifts$metric],
+    Season = fmt_value(shifts$season, shifts$metric),
+    `Last 4` = fmt_value(shifts$last4, shifts$metric),
+    Change = ifelse(shifts$flag,
+                    sprintf('<strong class="shift">%s</strong>',
+                            ifelse(grepl("^epa", shifts$metric), sprintf("%+.2f", shifts$diff),
+                                   sprintf("%+.0f pts", 100 * shifts$diff))),
+                    ifelse(grepl("^epa", shifts$metric), sprintf("%+.2f", shifts$diff),
+                           sprintf("%+.0f pts", 100 * shifts$diff))),
+    `Plays (last 4)` = fmt_n(shifts$n_last4),
+    check.names = FALSE)
+  html_table(tab)
+}
+```
+:::
+
+::: {.panel .wide}
+```{r epa-title, results="asis"}
+key <- c("early_down", "third_short", "third_long", "red_zone", "two_minute", "trailing_8plus")
+e <- do.call(rbind, lapply(key, function(s) do.call(rbind, lapply(c("epa_pass", "epa_run"), function(m) {
+  r <- pick(s, m)
+  data.frame(situation = s, metric = m, value = r$value, league_avg = r$league_avg,
+             n = r$n, rank = r$league_rank)
+}))))
+e$vs_avg <- e$value - e$league_avg
+ok <- e[!is.na(e$vs_avg) & e$n >= MIN_N, ]
+title <- if (nrow(ok) == 0) "EPA by play type in key situations" else {
+  best <- ok[which.max(ok$vs_avg), ]
+  sprintf("Most dangerous: %s %s (%s EPA per play vs. %s league)",
+          ifelse(best$metric == "epa_pass", "passes", "runs"),
+          SITUATION_PHRASES[[best$situation]],
+          fmt_value(best$value, "epa_play"), fmt_value(best$league_avg, "epa_play"))
+}
+cat("### ", title, "\n")
+```
+```{r epa-chart, fig.width=7.4, fig.height=1.6}
+e$label <- factor(SITUATION_LABELS[e$situation], levels = rev(SITUATION_LABELS[key]))
+e$type <- ifelse(e$metric == "epa_pass", "Dropbacks", "Runs")
+e$small <- e$n < MIN_N
+ggplot(e, aes(y = label)) +
+  geom_vline(xintercept = 0, colour = "grey85") +
+  geom_segment(aes(x = league_avg, xend = value, yend = label), colour = "grey70") +
+  geom_point(aes(x = league_avg), shape = 124, size = 3, colour = "grey40") +
+  geom_point(aes(x = value, alpha = small), size = 2.2, colour = opp_color) +
+  geom_text(aes(x = value, label = paste0("n=", n)), size = 2.1, vjust = -0.9, colour = "grey30") +
+  scale_alpha_manual(values = c(`FALSE` = 1, `TRUE` = 0.35), guide = "none") +
+  facet_wrap(~type, nrow = 1) +
+  labs(x = "EPA per play. Dot = them, tick = league average, faded = under 30 plays", y = NULL) +
+  theme_report()
+```
+:::
+
+:::
+
+::: {.footer}
+**How to read this.** Pass rate counts sacks and scrambles as passes. *Pass rate over expected* compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse `xpass` model). EPA = expected points added; above 0 is good for the offense. Early downs, 3rd down, red zone and "all neutral" use only plays when the offense's win probability was 5–95%. The 2-minute and trailing-by-8+ splits use every play. Numbers marked <span class="small-n">*</span> are under 30 plays: treat them as a hint, not a tendency. Shift = last 4 games differ from the season by 5+ points (0.10 EPA) on 30+ plays.
+Data: [nflverse](https://github.com/nflverse) play-by-play (nflfastR / nflreadr), openly licensed. Built by Chris Antosiewicz · [source](https://github.com/chrisantosiewicz/nfl-opponent-report).
+:::
+
+:::

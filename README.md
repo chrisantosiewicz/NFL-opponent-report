@@ -2,9 +2,41 @@
 
 Every Tuesday during the NFL season, an automated pipeline pulls the latest NFL play-by-play, runs a set of SQL models in DuckDB, and publishes a one-page tendency report on the Chicago Bears' next opponent.
 
-**Status:** kickoff (Oct 25, 2026). Build starts Nov 16; first automated report Tue Dec 15, 2026.
+**Status:** pipeline built Oct 26, 2026 (models, tests, report, workflow). First automated report Tue Dec 15, 2026.
 
-**Stack:** R (nflreadr) → DuckDB → hand-written `.sql` models run through DBI → data tests (queries that must return zero rows) → parameterized Quarto one-pager → GitHub Actions Tuesday cron → GitHub Pages with an archive.
+**Stack:** R (nflreadr) → DuckDB → `.sql` models run through DBI → data tests (queries that must return zero rows) → parameterized Quarto one-pager (HTML, plus PDF printed by headless Chrome) → GitHub Actions Tuesday cron → GitHub Pages with an archive.
+
+## Run it
+
+```sh
+Rscript run_pipeline.R              # load data, build models, run tests, render CHI's next opponent
+Rscript run_pipeline.R --skip-load  # reuse data/nfl.duckdb (fast while editing SQL)
+Rscript run_pipeline.R --no-render  # stop after the data tests
+Rscript run_pipeline.R --date=2026-12-15            # as if today were Dec 15
+Rscript run_pipeline.R --opponent=GB --week=16      # one specific matchup
+```
+
+Needs R, Quarto, and the packages in `DESCRIPTION` (pinned in `renv.lock`: run `renv::restore()`).
+
+## How it fits together
+
+| Step | File | Output |
+|------|------|--------|
+| Load | `R/pipeline.R` `load_raw_data()` | `raw_pbp`, `raw_schedules`, `raw_teams` in `data/nfl.duckdb` |
+| Staging | `sql/models/01_stg_plays.sql`, `02_dim_team.sql`, `03_stg_team_games.sql` | one row per scrimmage play with situation flags; 32 teams; one row per team per game |
+| Tendencies | `sql/models/10_team_game_tendencies.sql` | counts and sums per team, game and situation |
+| Rolling | `sql/models/11_team_rolling.sql` | season-to-date and last-4-games running totals (window frames) |
+| Snapshot | `sql/models/12_tendency_snapshot.sql` | what was known before each week (as-of join; no leakage) |
+| Ranks | `sql/models/13_tendency_ranks.sql`, `14_last_season_ranks.sql` | metric values, n, league rank, percentile; last season's ranks |
+| "3 things" | `sql/models/15_three_things.sql` | top/bottom 10% on 30+ plays, one per situation |
+| Tests | `sql/tests/*.sql` | each must return zero rows, or the run stops |
+| Report | `report/opponent_report.qmd` | `site/reports/<season>-week<NN>-<OPP>.html` / `.pdf` |
+| Site | `R/pipeline.R` `build_site()` | `site/index.html`: latest report + archive |
+| Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, publish to Pages |
+
+If any step fails in GitHub Actions, nothing is published, so the last good report stays live and GitHub emails the failure.
+
+If the Bears have no game left, the pipeline scouts both teams in every game of the next scheduled week (the playoffs).
 
 ## Definitions (locked Oct 25, 2026)
 
