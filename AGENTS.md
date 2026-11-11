@@ -17,7 +17,7 @@ Start here, then read at most one `CONTEXT.md`. The pipeline in one screen: [CON
 | `report/` | the Quarto one-pager: [contract](report/CONTEXT.md) |
 | `site/` | what GitHub Pages serves: [contract](site/CONTEXT.md); staff notes: [contract](site/notes/CONTEXT.md) |
 | `_tools/` | `links.py` checks every link and input path in the docs |
-| `.github/workflows/` | Tuesday run, Wednesday retry, publish to Pages |
+| `.github/workflows/` | Tuesday run, Wednesday retry, Thu/Sat/Sun/Mon updates, publish to Pages |
 
 ## Route by task
 

@@ -76,6 +76,34 @@ COPY (
          FROM betting_trends
          WHERE season = {{season}} AND as_of_week = {{week}}) AS betting,
 
+        -- Injury report behind the scouting page's injury flag (35_injury_report.sql):
+        -- each team's latest report for this game, starters first.
+        (SELECT list({team: team, report_week: report_week, current: is_current_report,
+                      player: player_name, position: position, status: report_status,
+                      injury: injury, practice: practice, flag: flag,
+                      snap_share: round(snap_share, 3), games: games_played,
+                      starter: is_starter, new: is_new}
+                     ORDER BY team, is_starter DESC,
+                              CASE flag WHEN 'out' THEN 1 WHEN 'questionable' THEN 2 ELSE 3 END,
+                              snap_share DESC NULLS LAST, player_name)
+         FROM injury_report
+         WHERE season = {{season}} AND week = {{week}})   AS injuries,
+
+        -- Kickoff forecast per game, domes neutral (36_game_weather.sql).
+        (SELECT list({game_id: game_id, home_team: home_team, roof: roof_class,
+                      neutral: is_neutral, stadium: stadium,
+                      kickoff_et: strftime(kickoff_et, '%Y-%m-%d %H:%M'),
+                      temp_f: round(temp_f, 0), wind_mph: round(wind_mph, 0),
+                      gust_mph: round(gust_mph, 0), precip_prob: round(precip_prob, 0),
+                      fetched_at: fetched_at, windy: is_windy, cold: is_cold, wet: is_wet})
+         FROM game_weather
+         WHERE season = {{season}} AND week = {{week}})   AS weather,
+
+        -- Past outdoor totals in the same conditions, for context next to the forecast.
+        (SELECT list({condition: condition, games: games, unders: unders, overs: overs,
+                      under_rate: round(under_rate, 4), total_vs_line: round(avg_total_vs_line, 2)})
+         FROM weather_history)                            AS weather_history,
+
         -- "What stands out" picks, same rule as the one-pager.
         (SELECT list({team: team, priority: priority, situation: situation, metric: metric}
                      ORDER BY team, priority)
