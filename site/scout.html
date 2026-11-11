@@ -412,9 +412,11 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
     if (w.temp_f == null) return `<div class="box"><h2>Game-day weather</h2><p class="muted">No forecast yet for ${where}. It appears within 7 days of kickoff and is refreshed the morning of the game.${roofNote}</p></div>`;
     const flags = [w.windy && "Windy", w.cold && "Cold", w.wet && "Rain/snow likely"].filter(Boolean);
     const ctx = [];
-    for (const [flag, c, label] of [[w.windy, "windy", "15+ mph wind"], [w.cold, "cold", "32°F or colder"]]) {
+    const wetKind = w.wet ? (w.temp_f <= 34 ? "snow" : "rain") : null;
+    for (const [flag, c, label] of [[w.windy, "windy", "with 15+ mph wind"], [w.cold, "cold", "at 32°F or colder"],
+                                    [wetKind === "rain", "rain", "played in rain"], [wetKind === "snow", "snow", "played in snow"]]) {
       const h = hist(c), all = hist("all_outdoor");
-      if (flag && h && h.games) ctx.push(`Since 2017, outdoor games with ${label} at kickoff went under the total ${pct(h.under_rate)} of the time (${h.games} games, ${h.total_vs_line > 0 ? "+" : ""}${h.total_vs_line} points vs the line on average${all ? `; all outdoor games: ${pct(all.under_rate)}` : ""}).`);
+      if (flag && h && h.games) ctx.push(`Since 2017, outdoor games ${label} at kickoff went under the total ${pct(h.under_rate)} of the time (${h.games} games, ${h.total_vs_line > 0 ? "+" : ""}${h.total_vs_line} points vs the line on average${all ? `; all outdoor games: ${pct(all.under_rate)}` : ""}).${c === "snow" && h.games < 30 ? " Small sample." : ""}`);
     }
     return `<div class="box"><h2>Game-day weather</h2>
       <div class="lines">

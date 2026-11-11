@@ -19,7 +19,10 @@ PBP_COLUMNS <- c(
   "air_yards", "yards_gained",
   # where the play went: run lane (left/middle/right x end/tackle/guard) and
   # pass area (left/middle/right x short/deep), for play_direction
-  "run_location", "run_gap", "pass_location", "pass_length"
+  "run_location", "run_gap", "pass_location", "pass_length",
+  # the gamebook's kickoff weather text ("Rain Temp: 45° F, ..."), for the
+  # rain and snow history next to the forecast (36_game_weather.sql)
+  "weather"
 )
 
 # Side feeds for the trade check. Each has a fixed column list so a failed
@@ -117,6 +120,17 @@ load_stadiums <- function(con, path = "config/stadiums.csv") {
   dbWriteTable(con, "raw_stadiums", stadiums, overwrite = TRUE)
   message("raw_stadiums: ", nrow(stadiums), " rows")
   invisible(stadiums)
+}
+
+# Gamebook kickoff weather for 2017-2023, the seasons load_raw_data() doesn't
+# pull (reference/gamebook_weather_2017_2023.csv, from nflverse play-by-play).
+# Later seasons come from raw_pbp's weather column. Fixed history: never edited.
+load_gamebook_weather <- function(con, path = "reference/gamebook_weather_2017_2023.csv") {
+  wx <- read.csv(path, colClasses = c("character", "integer", "character"), na.strings = "",
+                 encoding = "UTF-8")
+  dbWriteTable(con, "raw_gamebook_weather", wx, overwrite = TRUE)
+  message("raw_gamebook_weather: ", nrow(wx), " games")
+  invisible(wx)
 }
 
 # Hourly forecast (Open-Meteo, free, no key) at each stadium with a game in the

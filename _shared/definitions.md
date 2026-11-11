@@ -50,7 +50,7 @@ Implemented in `sql/models/08_stg_injuries.sql`, `35_injury_report.sql` and `36_
 | Forecast | Open-Meteo hourly forecast at the stadium (`config/stadiums.csv`), averaged temperature and highest wind, gust and precipitation chance over the kickoff hour and the two after. Fetched for games in the next 7 days on every run. |
 | Indoor | Schedule roof `dome` or `closed`, or a fixed-roof stadium when the schedule leaves it blank: weather neutral, no flags. A retractable roof the schedule hasn't set is treated as outdoor, with a note. |
 | Weather flags | Windy = 15+ mph sustained; cold = 32F or colder; wet = 50%+ precipitation chance. |
-| Weather context | Completed outdoor games since 2017 with the schedule's recorded kickoff temperature and wind: share that went under the closing total. Context next to the total, not a model input. |
+| Weather context | Completed outdoor games since 2017 with the schedule's recorded kickoff temperature and wind: share that went under the closing total, for windy, cold, rain and snow games. Rain/snow = the gamebook's kickoff sky description names it (not "chance of rain"); 2017-2023 from `reference/gamebook_weather_2017_2023.csv`, later seasons from play-by-play. The page shows rain or snow history when the forecast is wet (snow at 34F or below). Context next to the total, not a model input. |
 
 ## Trades during the season
 

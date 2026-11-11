@@ -16,6 +16,7 @@ Start here, then read at most one `CONTEXT.md`. The pipeline in one screen: [CON
 | `sql/export/` | JSON for the live page: [contract](sql/export/CONTEXT.md) |
 | `report/` | the Quarto one-pager: [contract](report/CONTEXT.md) |
 | `site/` | what GitHub Pages serves: [contract](site/CONTEXT.md); staff notes: [contract](site/notes/CONTEXT.md) |
+| `reference/` | fixed history files (2017-2023 gamebook weather), never edited |
 | `_tools/` | `links.py` checks every link and input path in the docs |
 | `.github/workflows/` | Tuesday run, Wednesday retry, Thu/Sat/Sun/Mon updates, publish to Pages |
 

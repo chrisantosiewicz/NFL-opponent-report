@@ -28,4 +28,8 @@ WHERE roof_class IS NULL
 
 UNION ALL
 SELECT 'weather_history', 'no outdoor games in history'
-WHERE NOT EXISTS (SELECT 1 FROM weather_history WHERE condition = 'all_outdoor' AND games > 0);
+WHERE NOT EXISTS (SELECT 1 FROM weather_history WHERE condition = 'all_outdoor' AND games > 0)
+
+UNION ALL
+SELECT 'weather_history', 'no rain games (gamebook weather not loaded?)'
+WHERE NOT EXISTS (SELECT 1 FROM weather_history WHERE condition = 'rain' AND games > 0);

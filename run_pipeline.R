@@ -30,6 +30,7 @@ if (!isTRUE(arg("skip-load", FALSE))) {
 }
 load_manual_trades(con)
 load_stadiums(con)
+load_gamebook_weather(con)
 if (!isTRUE(arg("skip-load", FALSE)) || !dbExistsTable(con, "raw_weather_hourly")) {
   fetch_weather(con, run_date)
 }

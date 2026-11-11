@@ -61,24 +61,52 @@ LEFT JOIN forecast f ON f.game_id = g.game_id;
 
 -- Completed outdoor games since 2017 with the stadium's recorded kickoff
 -- temperature and wind (nflverse schedules; blank for indoor games), and how
--- the total finished against the closing line, by condition.
+-- the total finished against the closing line, by condition. Rain and snow
+-- come from the gamebook's kickoff weather text: the description before
+-- "Temp:" names rain/showers/drizzle/storms (rain) or snow/flurries/sleet
+-- (snow), and does not only forecast it ("chance of rain", "rain possible").
 CREATE OR REPLACE TABLE weather_history AS
-WITH outdoor AS (
+WITH gamebook AS (
+    SELECT game_id, any_value(weather) AS weather
+    FROM (
+        SELECT game_id, weather FROM raw_gamebook_weather
+        UNION ALL
+        SELECT game_id, weather FROM raw_pbp WHERE weather IS NOT NULL
+    )
+    GROUP BY game_id
+),
+
+sky AS (
+    SELECT game_id,
+           lower(COALESCE(NULLIF(regexp_extract(weather, '^(.*?)Temp:', 1), ''), weather)) AS sky
+    FROM gamebook
+),
+
+outdoor AS (
     SELECT
-        TRY_CAST(temp AS DOUBLE)                              AS temp_f,
-        TRY_CAST(wind AS DOUBLE)                              AS wind_mph,
-        CAST(home_score AS DOUBLE) + CAST(away_score AS DOUBLE) - CAST(total_line AS DOUBLE)
+        TRY_CAST(s.temp AS DOUBLE)                            AS temp_f,
+        TRY_CAST(s.wind AS DOUBLE)                            AS wind_mph,
+        COALESCE(regexp_matches(k.sky, 'rain|shower|drizzle|thunder|storm')
+                 AND NOT regexp_matches(k.sky, 'chance|possible|later|expected|forecast'), FALSE)
+                                                              AS is_rain,
+        COALESCE(regexp_matches(k.sky, 'snow|flurr|sleet')
+                 AND NOT regexp_matches(k.sky, 'chance|possible|later|expected|forecast'), FALSE)
+                                                              AS is_snow,
+        CAST(s.home_score AS DOUBLE) + CAST(s.away_score AS DOUBLE) - CAST(s.total_line AS DOUBLE)
                                                               AS total_vs_line
-    FROM raw_schedules_history
-    WHERE lower(roof) IN ('outdoors', 'open')
-      AND result IS NOT NULL AND total_line IS NOT NULL
-      AND TRY_CAST(temp AS DOUBLE) IS NOT NULL AND TRY_CAST(wind AS DOUBLE) IS NOT NULL
+    FROM raw_schedules_history s
+    LEFT JOIN sky k ON k.game_id = s.game_id
+    WHERE lower(s.roof) IN ('outdoors', 'open')
+      AND s.result IS NOT NULL AND s.total_line IS NOT NULL
+      AND TRY_CAST(s.temp AS DOUBLE) IS NOT NULL AND TRY_CAST(s.wind AS DOUBLE) IS NOT NULL
 ),
 
 tagged AS (
     SELECT 'all_outdoor' AS condition, total_vs_line FROM outdoor
     UNION ALL SELECT 'windy', total_vs_line FROM outdoor WHERE wind_mph >= 15
     UNION ALL SELECT 'cold',  total_vs_line FROM outdoor WHERE temp_f <= 32
+    UNION ALL SELECT 'rain',  total_vs_line FROM outdoor WHERE is_rain
+    UNION ALL SELECT 'snow',  total_vs_line FROM outdoor WHERE is_snow
 )
 
 SELECT
