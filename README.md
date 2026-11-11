@@ -44,7 +44,10 @@ Needs R, Quarto, and the packages in `DESCRIPTION` (pinned in `renv.lock`: run `
 | Scout picks | `sql/models/29_scout_picks.sql` | the spots the notes call out (hot throw area, with "outside the hashes" when both sides qualify; run lean; softest and toughest run lanes), chosen once so the notes and report card grade the same thing |
 | Draft notes | `sql/models/30_draft_notes.sql` via `write_draft_notes()` | a narrative for every matchup in two halves (stopping their offense, attacking their defense) plus "what to look for" on each side, from tendencies, top target, defensive splits, position matchups, run lanes and pass areas and roster moves; `site/notes/drafts/<slug>.md` |
 | Report card | `sql/models/31_report_card.sql` | after each game, every call the notes made, in one line, next to what happened and a verdict (Hit / Miss / Mixed for tendencies; Called it / Held for threats on defense, Hit / Miss for soft spots on offense; Didn't come up) |
-| Live page | `site/scout.html` | interactive scout: any team, season or last 4, 32-team strips; staff notes from `site/notes/` |
+| Betting lines | `sql/models/07_stg_market_lines.sql` | spread, total and moneylines per game from nflverse schedules, with the market's win % |
+| Elo and predictions | `sql/models/32_elo_ratings.sql`, `33_game_predictions.sql`, `export_predictions()` | Elo v1 ratings since 2017, each game's model win %, locked in `site/data/predictions-<season>.json` and graded after the game |
+| Betting trends | `sql/models/34_betting_trends.sql` | ATS, straight-up and over/under records per team, season and last 4, home / away / favorite / underdog, with league ranks |
+| Live page | `site/scout.html` | interactive scout: any team, Scouting and Predictions tabs, season or last 4, 32-team strips; staff notes from `site/notes/` |
 | Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, publish to Pages |
 
 If any step fails in GitHub Actions, nothing is published, so the last good report stays live and GitHub emails the failure.

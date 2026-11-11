@@ -75,6 +75,26 @@ if (!has_current) {
     ORDER BY t.priority", params = list(season - 1L, opp_team))
 }
 
+# One line of betting context from the Predictions tab: the lines and the
+# model's win % (Elo, 33_game_predictions.sql) for the focal team.
+pred <- dbGetQuery(con, "
+  SELECT home_team, home_line, total_line, model_home_win, market_home_win, model_version
+  FROM game_predictions
+  WHERE season = ? AND week = ? AND ? IN (home_team, away_team) AND ? IN (home_team, away_team)",
+  params = list(season, week, opp_team, params$focal_team))
+pred_line <- if (nrow(pred) == 1 && !is.na(pred$model_home_win)) {
+  focal_home <- pred$home_team == params$focal_team
+  p_model  <- if (focal_home) pred$model_home_win else 1 - pred$model_home_win
+  p_market <- if (is.na(pred$market_home_win)) NA else if (focal_home) pred$market_home_win else 1 - pred$market_home_win
+  line     <- if (is.na(pred$home_line)) NA else if (focal_home) pred$home_line else -pred$home_line
+  paste0(
+    if (!is.na(line)) sprintf("Line: %s %s · O/U %s · ", params$focal_team,
+                              if (line == 0) "PK" else sprintf("%+g", line), format(pred$total_line)) else "",
+    sprintf("Model estimate (%s): %s %d%% to win", pred$model_version, params$focal_team, round(100 * p_model)),
+    if (!is.na(p_market)) sprintf(" (market %d%%)", round(100 * p_market)) else "",
+    ". Not betting advice.")
+} else ""
+
 dbDisconnect(con, shutdown = TRUE)
 
 opp <- league[league$team == opp_team, ]
@@ -118,6 +138,7 @@ html_table <- function(df) {
 opp_nick <- teams$team_nick[teams$team == opp_team]
 matchup <- if (isTRUE(as.logical(params$is_home))) paste(opp_nick, "at", focal_name) else paste(focal_name, "at", opp_nick)
 game_date <- format(as.Date(params$gameday), "%a %b %e, %Y")
+
 ```
 
 ::: {.report style="--team-color: `r opp_color`;"}
@@ -125,6 +146,7 @@ game_date <- format(as.Date(params$gameday), "%a %b %e, %Y")
 ::: {.header}
 [`r opp_name` offense]{.team}
 [Scouting report for the `r focal_name` · `r season` Week `r week` · `r matchup`, `r game_date`]{.sub}
+`r if (nzchar(pred_line)) paste0("[", pred_line, "]{.asof}") else ""`
 [`r if (has_current) sprintf("Data through Week %d (%d games). Only games before this week are used. Ranks are among all 32 teams.", through_week, games_played) else sprintf("No %d games yet: figures below are from the %d season.", season, season - 1)`]{.asof}
 :::
 

@@ -46,10 +46,13 @@ load_raw_data <- function(con, seasons) {
   if (nrow(pbp) == 0) stop("load_pbp() returned no rows")
 
   schedules <- as.data.frame(nflreadr::load_schedules(seasons))
+  # Every season since 2017, for the Elo ratings (sql/models/32_elo_ratings.sql).
+  schedules_history <- as.data.frame(nflreadr::load_schedules(2017:max(seasons)))
   teams <- as.data.frame(nflreadr::load_teams(current = TRUE))
 
   dbWriteTable(con, "raw_pbp", pbp, overwrite = TRUE)
   dbWriteTable(con, "raw_schedules", schedules, overwrite = TRUE)
+  dbWriteTable(con, "raw_schedules_history", schedules_history, overwrite = TRUE)
   dbWriteTable(con, "raw_teams", teams, overwrite = TRUE)
 
   feeds <- rbind(
@@ -188,6 +191,30 @@ export_site_data <- function(con, season, week, focal_team, site_dir = "site") {
                    season = as.integer(season), week = as.integer(week),
                    focal_team = focal_team, path = path, updated = updated_stamp())
   run_sql_template(con, "sql/export/site_index.sql", dir = normalizePath(data_dir))
+  message("exported ", path)
+  invisible(path)
+}
+
+# Writes site/data/predictions-<season>.json: the model's win % for every game,
+# locked. The report week's games are added the first time a run sees them
+# before game day, and a locked row is never rewritten, so a later run (or a
+# model change) can't change a call after the fact. Results and grades are
+# filled in from the schedule on every run.
+export_predictions <- function(con, season, week, run_date, site_dir = "site") {
+  data_dir <- file.path(site_dir, "data")
+  dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
+  path <- file.path(normalizePath(data_dir), sprintf("predictions-%d.json", as.integer(season)))
+  if (file.exists(path)) {
+    dbExecute(con, sprintf("CREATE OR REPLACE TABLE raw_prediction_locks AS
+      SELECT game_id, model_home_win, market_home_win, home_line, total_line, model_version, locked_at
+      FROM (SELECT unnest(games, recursive := true) FROM read_json('%s'))", path))
+  } else {
+    dbExecute(con, "CREATE OR REPLACE TABLE raw_prediction_locks (game_id VARCHAR, model_home_win DOUBLE,
+      market_home_win DOUBLE, home_line DOUBLE, total_line DOUBLE, model_version VARCHAR, locked_at VARCHAR)")
+  }
+  run_sql_template(con, "sql/export/site_predictions.sql", season = as.integer(season),
+                   week = as.integer(week), run_date = format(as.Date(run_date)), path = path,
+                   updated = updated_stamp())
   message("exported ", path)
   invisible(path)
 }

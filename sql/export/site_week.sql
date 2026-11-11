@@ -49,6 +49,33 @@ COPY (
          FROM draft_notes
          WHERE season = {{season}} AND week = {{week}})   AS drafts,
 
+        -- This week's betting lines and the model's win % (Predictions tab).
+        -- Lines from nflverse schedules; home_line is from the home side,
+        -- favorite negative. The model is Elo (33_game_predictions.sql).
+        (SELECT list({game_id: game_id, home_team: home_team, away_team: away_team,
+                      home_line: home_line, total_line: total_line,
+                      home_moneyline: home_moneyline, away_moneyline: away_moneyline,
+                      market_home_win: round(market_home_win, 4),
+                      model_home_win: round(model_home_win, 4),
+                      model_version: model_version}
+                     ORDER BY gameday, game_id)
+         FROM game_predictions
+         WHERE season = {{season}} AND week = {{week}})   AS lines,
+
+        -- Records against past closing lines, every team, both windows
+        -- (34_betting_trends.sql). Games before this week only.
+        (SELECT list({team: team, span: span, split: split, games: games,
+                      su_wins: su_wins, su_losses: su_losses, su_ties: su_ties,
+                      lined: lined_games,
+                      ats_wins: ats_wins, ats_losses: ats_losses, ats_pushes: ats_pushes,
+                      cover_margin: round(avg_cover_margin, 2), cover_rate: round(cover_rate, 4),
+                      cover_rank: cover_rank,
+                      overs: overs, unders: unders, total_pushes: total_pushes,
+                      total_vs_line: round(avg_total_vs_line, 2), over_rate: round(over_rate, 4),
+                      over_rank: over_rank, teams: league_teams})
+         FROM betting_trends
+         WHERE season = {{season}} AND as_of_week = {{week}}) AS betting,
+
         -- "What stands out" picks, same rule as the one-pager.
         (SELECT list({team: team, priority: priority, situation: situation, metric: metric}
                      ORDER BY team, priority)
