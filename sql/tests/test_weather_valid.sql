@@ -7,11 +7,16 @@ FROM game_weather
 WHERE is_neutral AND (is_windy OR is_cold OR is_wet)
 
 UNION ALL
-SELECT game_id, 'forecast out of range'
+SELECT game_id, 'forecast out of range: ' || concat_ws(', ',
+       CASE WHEN temp_f NOT BETWEEN -40 AND 120 THEN 'temp ' || temp_f END,
+       CASE WHEN wind_mph NOT BETWEEN 0 AND 100 THEN 'wind ' || wind_mph END,
+       CASE WHEN gust_mph NOT BETWEEN 0 AND 150 THEN 'gust ' || gust_mph END,
+       CASE WHEN precip_prob NOT BETWEEN 0 AND 100 THEN 'precip ' || precip_prob END,
+       CASE WHEN forecast_hours > 3 THEN 'hours ' || forecast_hours END)
 FROM game_weather
 WHERE temp_f NOT BETWEEN -40 AND 120
    OR wind_mph NOT BETWEEN 0 AND 100
-   OR gust_mph < wind_mph
+   OR gust_mph NOT BETWEEN 0 AND 150
    OR precip_prob NOT BETWEEN 0 AND 100
    OR forecast_hours > 3
 

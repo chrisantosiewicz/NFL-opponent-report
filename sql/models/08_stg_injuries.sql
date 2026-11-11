@@ -28,4 +28,11 @@ SELECT
 FROM raw_injuries i
 LEFT JOIN team_alias a ON a.alias = i.team
 WHERE NULLIF(trim(i.gsis_id), '') IS NOT NULL
-  AND TRY_CAST(i.week AS INTEGER) IS NOT NULL;
+  AND TRY_CAST(i.week AS INTEGER) IS NOT NULL
+-- The feed occasionally lists a player twice in one team-week (e.g. 2024 week
+-- 15). Keep one row, preferring the one with a game status.
+QUALIFY row_number() OVER (
+    PARTITION BY CAST(i.season AS INTEGER), CAST(i.week AS INTEGER), COALESCE(a.team, i.team), i.gsis_id
+    ORDER BY (trim(i.report_status) IN ('Out', 'Doubtful', 'Questionable')) DESC NULLS LAST,
+             trim(i.practice_status) NULLS LAST
+) = 1;
