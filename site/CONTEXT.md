@@ -7,7 +7,7 @@ One job: hold the published reports, the live scout page and the archive.
 | `scout.html`, `archive.html`, `index_template.html` | hand-edited pages | people |
 | `index.html` | generated: latest report + archive | `build_site()` |
 | `reports/` | generated one-pagers | `render_report()` |
-| `data/` | generated JSON | `../sql/export/` |
+| `data/` | generated JSON, including the locked `predictions-<season>.json` | `../sql/export/` |
 | `notes/drafts/` | generated draft notes | `write_draft_notes()` |
 | `notes/` | staff notes, final | Chris: [contract](notes/CONTEXT.md) |
 

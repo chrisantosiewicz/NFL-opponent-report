@@ -7,7 +7,7 @@ Load, model, test, render, write notes, publish. One command runs the code steps
 | 1 Load | `R/pipeline.R` `load_raw_data()`, `config/*.csv` | `raw_*` tables in `data/nfl.duckdb` | freshness test in step 3 |
 | 2 Model | `sql/models/` (file-name order) | DuckDB tables | step 3 |
 | 3 Test | `sql/tests/` | nothing, or the run stops | every query returns zero rows |
-| 4 Export | `sql/export/` | `site/data/*.json` | the live page loads the week |
+| 4 Export | `sql/export/` | `site/data/*.json` (week, index, report cards, locked predictions) | the live page loads the week |
 | 5 Render | `report/opponent_report.qmd` | `site/reports/<season>-week<NN>-<OPP>.html` / `.pdf` | one page; small samples marked |
 | 6 Draft notes | `sql/models/30_draft_notes.sql`, `write_draft_notes()` | `site/notes/drafts/<slug>.md` | **a person**: Chris edits and saves to `site/notes/<slug>.md` |
 | 7 Publish | `.github/workflows/weekly-report.yml`, `build_site()` | `site/index.html`, GitHub Pages | Action is green on `main` |

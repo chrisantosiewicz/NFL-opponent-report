@@ -10,6 +10,7 @@ One job: write what `site/scout.html` and `site/archive.html` fetch.
 1. `site_week.sql`: all 32 teams for one week -> `site/data/<season>-week<NN>.json`.
 2. `site_index.sql`: the weeks on disk, newest first -> `site/data/index.json`.
 3. `site_report_cards.sql`: every graded matchup -> `site/data/report-cards-<season>.json`.
+4. `site_predictions.sql`: locked win-% calls with results and grades -> `site/data/predictions-<season>.json`. `export_predictions()` reads the existing file first, so a locked call is never rewritten.
 
 ## Outputs
 - `site/data/*.json`

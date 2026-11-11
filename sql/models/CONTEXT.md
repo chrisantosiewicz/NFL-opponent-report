@@ -11,7 +11,7 @@ Do NOT load: `site/reports/`, `site/data/`.
 
 ## Process
 1. Files run in file-name order (`build_models()`); a model may only read lower-numbered models.
-2. Numbering bands: `01-09` staging and feeds, `10-17` tendencies, ranks and trades, `18-31` targets, formations, defense, direction, notes and grading.
+2. Numbering bands: `01-09` staging and feeds, `10-17` tendencies, ranks and trades, `18-31` targets, formations, defense, direction, notes and grading, `32-39` betting lines, Elo and predictions (`07_stg_market_lines` is staging).
 3. Store counts and sums; compute rates last. Every number keeps its `n`.
 4. A report for week N uses only games before week N.
 5. A definition lives in one model; others read it from there.
