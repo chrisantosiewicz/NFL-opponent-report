@@ -6,6 +6,7 @@
 #   Rscript run_pipeline.R --date=2026-12-15  # pretend today is this date
 #   Rscript run_pipeline.R --team=DET         # scout DET's next opponent instead
 #   Rscript run_pipeline.R --opponent=GB --week=16   # render one specific matchup for the team
+#   Rscript run_pipeline.R --update           # midweek refresh: injuries, lines, weather only
 
 source("R/pipeline.R")
 
@@ -28,8 +29,29 @@ if (!isTRUE(arg("skip-load", FALSE))) {
   load_raw_data(con, (season - 2):season)
 }
 load_manual_trades(con)
+load_stadiums(con)
+load_gamebook_weather(con)
+if (!isTRUE(arg("skip-load", FALSE)) || !dbExistsTable(con, "raw_weather_hourly")) {
+  fetch_weather(con, run_date)
+}
 build_models(con)
 run_data_tests(con)
+
+# Update runs (Thursday, Saturday, Sunday and Monday mornings; see
+# .github/workflows/weekly-report.yml) refresh the live page's data for the
+# week already published: injury reports, lines and the game-day forecast.
+# They render no report and leave the archive alone.
+if (isTRUE(arg("update", FALSE))) {
+  week <- find_update_week(con, run_date)
+  if (nrow(week) == 0) {
+    message("Update: no published week with games still to play. Nothing to refresh.")
+    quit(save = "no", status = 0)
+  }
+  export_site_data(con, week$season, week$week, team)
+  export_predictions(con, week$season, week$week, run_date)
+  message(sprintf("Update: refreshed %d week %d", week$season, week$week))
+  quit(save = "no", status = 0)
+}
 
 if (isTRUE(arg("no-render", FALSE))) quit(save = "no")
 

@@ -19,7 +19,10 @@ PBP_COLUMNS <- c(
   "air_yards", "yards_gained",
   # where the play went: run lane (left/middle/right x end/tackle/guard) and
   # pass area (left/middle/right x short/deep), for play_direction
-  "run_location", "run_gap", "pass_location", "pass_length"
+  "run_location", "run_gap", "pass_location", "pass_length",
+  # the gamebook's kickoff weather text ("Rain Temp: 45° F, ..."), for the
+  # rain and snow history next to the forecast (36_game_weather.sql)
+  "weather"
 )
 
 # Side feeds for the trade check. Each has a fixed column list so a failed
@@ -31,6 +34,14 @@ SNAP_COLUMNS <- c("game_id", "season", "week", "player", "pfr_player_id", "posit
 PLAYER_COLUMNS <- c("gsis_id", "pfr_id", "display_name", "position")
 ROSTER_COLUMNS <- c("season", "week", "game_type", "team", "status", "full_name",
                     "position", "gsis_id", "pfr_id")
+# The official injury report (latest version of each week's), for the injury
+# flag on the scouting page (sql/models/08_stg_injuries.sql).
+INJURY_COLUMNS <- c("season", "game_type", "team", "week", "gsis_id", "position", "full_name",
+                    "report_primary_injury", "report_status", "practice_primary_injury",
+                    "practice_status")
+# Hourly forecast rows for upcoming games (fetch_weather()); times are US Eastern.
+WEATHER_COLUMNS <- c("game_id", "time", "temp_f", "wind_mph", "gust_mph", "precip_prob",
+                     "precip_in", "fetched_at")
 
 connect_db <- function(path = "data/nfl.duckdb", read_only = FALSE) {
   dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
@@ -62,7 +73,8 @@ load_raw_data <- function(con, seasons) {
     }),
     load_side_feed(con, "raw_snap_counts", SNAP_COLUMNS, function() nflreadr::load_snap_counts(seasons)),
     load_side_feed(con, "raw_players", PLAYER_COLUMNS, function() nflreadr::load_players()),
-    load_side_feed(con, "raw_rosters_weekly", ROSTER_COLUMNS, function() nflreadr::load_rosters_weekly(seasons))
+    load_side_feed(con, "raw_rosters_weekly", ROSTER_COLUMNS, function() nflreadr::load_rosters_weekly(seasons)),
+    load_side_feed(con, "raw_injuries", INJURY_COLUMNS, function() nflreadr::load_injuries(seasons))
   )
   dbWriteTable(con, "raw_feed_status", feeds, overwrite = TRUE)
   message(sprintf("raw_pbp: %s plays, raw_schedules: %s games",
@@ -98,6 +110,84 @@ load_manual_trades <- function(con, path = "config/trades_manual.csv") {
   dbWriteTable(con, "raw_trades_manual", manual, overwrite = TRUE)
   message("raw_trades_manual: ", nrow(manual), " rows")
   invisible(manual)
+}
+
+# Stadium locations and roof types (config/stadiums.csv), for the weather
+# forecast. Loaded on every run, like the manual trades.
+load_stadiums <- function(con, path = "config/stadiums.csv") {
+  stadiums <- read.csv(path, na.strings = "", comment.char = "#",
+                       colClasses = c("character", "character", "numeric", "numeric", "character"))
+  dbWriteTable(con, "raw_stadiums", stadiums, overwrite = TRUE)
+  message("raw_stadiums: ", nrow(stadiums), " rows")
+  invisible(stadiums)
+}
+
+# Gamebook kickoff weather for 2017-2023, the seasons load_raw_data() doesn't
+# pull (reference/gamebook_weather_2017_2023.csv, from nflverse play-by-play).
+# Later seasons come from raw_pbp's weather column. Fixed history: never edited.
+load_gamebook_weather <- function(con, path = "reference/gamebook_weather_2017_2023.csv") {
+  wx <- read.csv(path, colClasses = c("character", "integer", "character"), na.strings = "",
+                 encoding = "UTF-8")
+  dbWriteTable(con, "raw_gamebook_weather", wx, overwrite = TRUE)
+  message("raw_gamebook_weather: ", nrow(wx), " games")
+  invisible(wx)
+}
+
+# Hourly forecast (Open-Meteo, free, no key) at each stadium with a game in the
+# next `days` days, written to raw_weather_hourly. Domes are fetched too; the
+# SQL (36_game_weather.sql) marks them neutral. Like the side feeds, a failed
+# fetch is a warning, not a stopped run: the table is left empty and the page
+# shows no forecast. Only coordinates and dates are sent.
+fetch_weather <- function(con, run_date, days = 7) {
+  run_date <- as.Date(run_date)
+  empty <- as.data.frame(setNames(replicate(length(WEATHER_COLUMNS), character(), simplify = FALSE),
+                                  WEATHER_COLUMNS))
+  games <- dbGetQuery(con, "
+    SELECT s.game_id, CAST(s.gameday AS VARCHAR) AS gameday, s.stadium_id, st.lat, st.lon
+    FROM raw_schedules s
+    LEFT JOIN raw_stadiums st ON st.stadium_id = s.stadium_id
+    WHERE CAST(s.gameday AS DATE) BETWEEN ? AND ?",
+    params = list(run_date, run_date + days))
+  missing <- unique(games$stadium_id[is.na(games$lat)])
+  if (length(missing) > 0) warn_run(paste("No stadium location in config/stadiums.csv for",
+                                          paste(missing, collapse = ", ")), title = "Weather")
+  games <- games[!is.na(games$lat), ]
+  rows <- empty
+  if (nrow(games) > 0) {
+    rows <- tryCatch({
+      spots <- unique(games[, c("lat", "lon")])
+      url <- paste0(
+        "https://api.open-meteo.com/v1/forecast",
+        "?latitude=", paste(spots$lat, collapse = ","),
+        "&longitude=", paste(spots$lon, collapse = ","),
+        "&hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability,precipitation",
+        "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch",
+        "&timezone=America%2FNew_York",
+        "&start_date=", min(games$gameday), "&end_date=", format(as.Date(max(games$gameday)) + 1))
+      res <- curl::curl_fetch_memory(url, handle = curl::new_handle(timeout = 60))
+      if (res$status_code != 200) stop("HTTP ", res$status_code)
+      body <- jsonlite::fromJSON(rawToChar(res$content), simplifyVector = FALSE)
+      if (!is.null(body$hourly)) body <- list(body)  # one location comes back unwrapped
+      fetched <- format(Sys.time(), "%Y-%m-%d %H:%M UTC", tz = "UTC")
+      num <- function(x) vapply(x, function(v) if (is.null(v)) NA_real_ else as.numeric(v), numeric(1))
+      per_spot <- lapply(seq_len(nrow(spots)), function(i) {
+        h <- body[[i]]$hourly
+        ids <- games$game_id[games$lat == spots$lat[i] & games$lon == spots$lon[i]]
+        do.call(rbind, lapply(ids, function(id) data.frame(
+          game_id = id, time = unlist(h$time), temp_f = num(h$temperature_2m),
+          wind_mph = num(h$wind_speed_10m), gust_mph = num(h$wind_gusts_10m),
+          precip_prob = num(h$precipitation_probability), precip_in = num(h$precipitation),
+          fetched_at = fetched)))
+      })
+      do.call(rbind, per_spot)
+    }, error = function(e) {
+      warn_run(paste("Weather forecast fetch failed:", conditionMessage(e)), title = "Weather")
+      empty
+    })
+  }
+  dbWriteTable(con, "raw_weather_hourly", rows, overwrite = TRUE)
+  message("raw_weather_hourly: ", nrow(rows), " rows for ", length(unique(rows$game_id)), " games")
+  invisible(rows)
 }
 
 # Run every .sql file in a folder, in file-name order (01_, 02_, 10_, ...).
@@ -164,6 +254,23 @@ find_next_week_matchups <- function(con, on_date = Sys.Date()) {
     FROM stg_team_games g
     JOIN next_week w ON w.season = g.season AND w.week = g.week
     ORDER BY g.gameday, g.game_id, g.is_home", params = list(as.Date(on_date)))
+}
+
+# The week an update run refreshes: the newest week already published in
+# site/data (the Tuesday run's), as long as one of its games is still to be
+# played on or after `on_date`. Empty when there is nothing left to refresh.
+find_update_week <- function(con, on_date = Sys.Date(), site_dir = "site") {
+  files <- list.files(file.path(site_dir, "data"), pattern = "^\\d{4}-week\\d{2}\\.json$")
+  none <- data.frame(season = integer(), week = integer())
+  if (length(files) == 0) return(none)
+  latest <- sort(files, decreasing = TRUE)[1]
+  season <- as.integer(substr(latest, 1, 4))
+  week <- as.integer(substr(latest, 10, 11))
+  open <- dbGetQuery(con, "SELECT count(*) AS n FROM stg_team_games
+                           WHERE season = ? AND week = ? AND gameday >= ?",
+                     params = list(season, week, as.Date(on_date)))$n
+  if (open == 0) return(none)
+  data.frame(season = season, week = week)
 }
 
 # Fill {{name}} placeholders in a .sql file and run it. Values are integers,
@@ -298,9 +405,9 @@ check_trades <- function(con, game) {
   invisible(moves)
 }
 
-warn_run <- function(text) {
+warn_run <- function(text, title = "Trade check") {
   message("WARNING: ", text)
-  if (identical(Sys.getenv("GITHUB_ACTIONS"), "true")) cat("::warning title=Trade check::", text, "\n", sep = "")
+  if (identical(Sys.getenv("GITHUB_ACTIONS"), "true")) cat("::warning title=", title, "::", text, "\n", sep = "")
 }
 
 report_slug <- function(season, week, opponent) {

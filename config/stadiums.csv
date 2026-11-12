@@ -1,0 +1,49 @@
+# Stadium locations for the game-day weather forecast (fetch_weather() in R/pipeline.R).
+# stadium_id: nflverse schedules' stadium_id. lat/lon: decimal degrees, to about 1 km.
+# roof: dome (fixed roof), retractable, or outdoors. The schedule's own roof field wins
+# when it is filled in (dome/closed = indoor, outdoors/open = outdoor); this column is
+# only used when the schedule leaves it blank, which it does for retractable roofs
+# until game day. Add a row when the schedule names a new stadium (a "no stadium
+# location" warning in the run log means one is missing).
+stadium_id,stadium,lat,lon,roof
+ATL97,Mercedes-Benz Stadium,33.7554,-84.4008,retractable
+BAL00,M&T Bank Stadium,39.2780,-76.6227,outdoors
+BOS00,Gillette Stadium,42.0909,-71.2643,outdoors
+BUF00,Highmark Stadium,42.7738,-78.7870,outdoors
+CAR00,Bank of America Stadium,35.2258,-80.8528,outdoors
+CHI98,Soldier Field,41.8623,-87.6167,outdoors
+CIN00,Paycor Stadium,39.0955,-84.5161,outdoors
+CLE00,Huntington Bank Field,41.5061,-81.6995,outdoors
+DAL00,AT&T Stadium,32.7473,-97.0945,retractable
+DEN00,Empower Field at Mile High,39.7439,-105.0201,outdoors
+DET00,Ford Field,42.3400,-83.0456,dome
+GNB00,Lambeau Field,44.5013,-88.0622,outdoors
+HOU00,NRG Stadium,29.6847,-95.4107,retractable
+IND00,Lucas Oil Stadium,39.7601,-86.1639,retractable
+JAX00,EverBank Stadium,30.3239,-81.6373,outdoors
+KAN00,GEHA Field at Arrowhead Stadium,39.0489,-94.4839,outdoors
+LAX01,SoFi Stadium,33.9535,-118.3392,dome
+MIA00,Hard Rock Stadium,25.9580,-80.2389,outdoors
+MIN01,U.S. Bank Stadium,44.9737,-93.2575,dome
+NAS00,Nissan Stadium,36.1665,-86.7713,outdoors
+NOR00,Caesars Superdome,29.9511,-90.0812,dome
+NYC01,MetLife Stadium,40.8135,-74.0745,outdoors
+PHI00,Lincoln Financial Field,39.9008,-75.1675,outdoors
+PHO00,State Farm Stadium,33.5276,-112.2626,retractable
+PIT00,Acrisure Stadium,40.4468,-80.0158,outdoors
+SEA00,Lumen Field,47.5952,-122.3316,outdoors
+SFO01,Levi's Stadium,37.4030,-121.9700,outdoors
+TAM00,Raymond James Stadium,27.9759,-82.5033,outdoors
+VEG00,Allegiant Stadium,36.0909,-115.1833,dome
+WAS00,Northwest Stadium,38.9078,-76.8645,outdoors
+FRA00,Deutsche Bank Park,50.0686,8.6455,outdoors
+GER00,Allianz Arena,48.2188,11.6247,outdoors
+LON00,Wembley Stadium,51.5560,-0.2796,outdoors
+LON02,Tottenham Hotspur Stadium,51.6043,-0.0664,outdoors
+MAD01,Santiago Bernabeu,40.4531,-3.6883,retractable
+MEL00,Melbourne Cricket Ground,-37.8200,144.9834,outdoors
+MEX00,Estadio Banorte,19.3029,-99.1505,outdoors
+MUN01,Allianz Arena,48.2188,11.6247,outdoors
+PAR00,Stade de France,48.9245,2.3602,outdoors
+RIO00,Maracana Stadium,-22.9121,-43.2302,outdoors
+SAO00,Arena Corinthians,-23.5453,-46.4742,outdoors

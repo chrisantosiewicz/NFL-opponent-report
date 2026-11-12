@@ -138,6 +138,20 @@ table.h2h tr.grp td { font-family: var(--display); font-weight: 700; font-size: 
 table.h2h td small { color: var(--muted); font-size: 11px; display: block; }
 table.h2h td.small { color: var(--muted); }
 table.h2h td.small b::after { content: "*"; color: var(--warn); }
+/* Injury flag and game-day weather. */
+.inj-badge { display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; color: var(--warn); }
+.inj-badge.out { color: var(--accent); }
+table.inj { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.inj td { padding: 5px 6px; border-top: 1px solid var(--rule); vertical-align: top; }
+table.inj td.pl b { font-weight: 600; }
+table.inj td.num { font-family: var(--mono); text-align: right; white-space: nowrap; color: var(--muted); }
+.pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.out { color: var(--accent); }
+.pill.questionable { color: var(--warn); }
+.pill.practice { color: var(--muted); }
+.tag-new { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; color: var(--card); background: var(--accent); border-radius: 3px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
+.also { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+.wx-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 table.h2h td b { font-weight: 500; font-family: var(--mono); }
 .disclaimer { font-size: 12px; color: var(--muted); }
 
@@ -321,17 +335,17 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
 
   // ---- Header: who is being scouted, for whom, and the two tabs ----------
   const dayOf = g => new Date(g.gameday + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
-  function sideHtml(t, role, scouted) {
+  function sideHtml(t, role, scouted, badge = "") {
     return `<div class="side${scouted ? " scouted" : ""}" style="--c:${esc(t.color || "#888")}"><span class="sw"></span>
-      <div><div class="role">${esc(role)}</div><div class="nm">${esc(t.nick)}</div></div></div>`;
+      <div><div class="role">${esc(role)}</div><div class="nm">${esc(t.nick)}</div>${badge}</div></div>`;
   }
   function headerHtml(d, team, info, game, focal, isFocalOpp, pdf, backToOpp) {
     const focalNick = focal ? focal.nick : "Bears";
-    let bar = sideHtml(info, "Scouting", true), when = `Week ${d.week} · no game (bye)`;
+    let bar = sideHtml(info, "Scouting", true, injuryBadge(d, team)), when = `Week ${d.week} · no game (bye)`;
     if (game) {
       const opp = d.teamInfo.get(game.opponent) || { nick: game.opponent, color: "#888" };
       const oppRole = game.opponent === d.focal_team ? "Us" : "Opponent";
-      const me = sideHtml(info, "Scouting", true), them = sideHtml(opp, oppRole, false);
+      const me = sideHtml(info, "Scouting", true, injuryBadge(d, team)), them = sideHtml(opp, oppRole, false, injuryBadge(d, game.opponent));
       bar = game.is_home ? `${them}<span class="at">at</span>${me}` : `${me}<span class="at">at</span>${them}`;
       when = `Week ${d.week} · ${dayOf(game)}`;
     }
@@ -347,6 +361,72 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
         <div class="quick">${pdf}${backToOpp}</div>
         <nav class="tabs" aria-label="View">${tab("scouting", "Scouting")}${tab("predictions", "Predictions")}</nav>
       </header>`;
+  }
+
+  // ---- Injury flag and weather ------------------------------------------------
+  const PRACTICE = { DNP: "Did not practice", Limited: "Limited in practice", Full: "Full practice" };
+  function injuriesFor(d, team) { return (d.injuries || []).filter(r => r.team === team); }
+  function injuryCounts(d, team) {
+    const st = injuriesFor(d, team).filter(r => r.starter);
+    return { out: st.filter(r => r.flag === "out").length, q: st.filter(r => r.flag === "questionable").length };
+  }
+  function injuryBadge(d, team) {
+    if (!d.injuries) return "";
+    const c = injuryCounts(d, team);
+    if (c.out) return `<div class="inj-badge out">⚠ ${c.out} starter${c.out > 1 ? "s" : ""} out${c.q ? ` · ${c.q} questionable` : ""}</div>`;
+    if (c.q) return `<div class="inj-badge">${c.q} starter${c.q > 1 ? "s" : ""} questionable</div>`;
+    return "";
+  }
+  function injuryWhich(d, rows) {
+    if (!rows.length) return "";
+    return rows[0].current ? `Week ${d.week} injury report, as of the last update.`
+      : `No Week ${d.week} report yet (teams file the first one the Wednesday before the game, or Monday before a Thursday game). Showing the Week ${rows[0].report_week} final report.`;
+  }
+  function statusPill(r) {
+    const txt = r.status || PRACTICE[r.practice] || "Listed";
+    return `<span class="pill ${esc(r.flag)}">${esc(txt)}</span>`;
+  }
+  function injuryBox(d, t, opts = {}) {
+    if (!d.injuries) return `<div class="box"><h2>${esc(t.nick)} injuries</h2><p class="muted">No injury report in this week's data.</p></div>`;
+    const rows = injuriesFor(d, t.team);
+    if (!rows.length) return `<div class="box"><h2>${esc(t.nick)} injuries</h2><p class="muted">Nobody on the ${esc(t.nick)}' latest injury report.</p></div>`;
+    const starters = rows.filter(r => r.starter), others = rows.filter(r => !r.starter);
+    const limit = opts.compact ? 6 : 99;
+    const row = r => `<tr><td class="pl"><b>${esc(r.player)}</b> <span class="muted">${esc(r.position || "")}</span>${r.new ? `<span class="tag-new" title="Not on the previous week's report">NEW</span>` : ""}
+        <div class="muted" style="font-size:12px">${esc(r.injury || "")}${r.status && r.practice && r.practice !== "Full" ? ` · ${esc(PRACTICE[r.practice])}` : ""}</div></td>
+      <td>${statusPill(r)}</td><td class="num" title="Average share of snaps in the games he played, last 4 team games">${r.snap_share == null ? "–" : Math.round(100 * r.snap_share) + "% snaps"}</td></tr>`;
+    return `<div class="box"><h2>${esc(t.nick)} injuries${starters.length ? ` · ${starters.length} starter${starters.length > 1 ? "s" : ""} listed` : ""}</h2>
+      ${starters.length ? `<table class="inj"><tbody>${starters.slice(0, limit).map(row).join("")}</tbody></table>` : `<p class="muted">No starters on the report.</p>`}
+      ${others.length ? `<p class="also">Also listed: ${others.map(r => `${esc(r.player)} (${esc(r.position || "")}, ${esc(r.status || r.practice || "listed")})`).join(", ")}.</p>` : ""}
+      <p class="muted" style="margin:8px 0 0;font-size:12px">${esc(injuryWhich(d, rows))} Starter: 50%+ of offensive or defensive snaps in the games he played, last 4 games. <span class="tag-new">NEW</span> = not on the previous week's report.</p></div>`;
+  }
+  function weatherBox(d, game, team) {
+    if (!game || !d.weather) return "";
+    const home = game.is_home ? team : game.opponent;
+    const w = d.weather.find(x => x.home_team === home);
+    if (!w) return "";
+    const hist = c => (d.weather_history || []).find(h => h.condition === c);
+    const where = esc(w.stadium || "");
+    if (w.neutral) return `<div class="box"><h2>Game-day weather</h2><p>Indoors at ${where} (dome or closed roof): weather is neutral for this game.</p></div>`;
+    const roofNote = w.roof === "retractable" ? ` ${where} has a retractable roof; it may be closed if the weather is bad.` : "";
+    if (w.temp_f == null) return `<div class="box"><h2>Game-day weather</h2><p class="muted">No forecast yet for ${where}. It appears within 7 days of kickoff and is refreshed the morning of the game.${roofNote}</p></div>`;
+    const flags = [w.windy && "Windy", w.cold && "Cold", w.wet && "Rain/snow likely"].filter(Boolean);
+    const ctx = [];
+    const wetKind = w.wet ? (w.temp_f <= 34 ? "snow" : "rain") : null;
+    for (const [flag, c, label] of [[w.windy, "windy", "with 15+ mph wind"], [w.cold, "cold", "at 32°F or colder"],
+                                    [wetKind === "rain", "rain", "played in rain"], [wetKind === "snow", "snow", "played in snow"]]) {
+      const h = hist(c), all = hist("all_outdoor");
+      if (flag && h && h.games) ctx.push(`Since 2017, outdoor games ${label} at kickoff went under the total ${pct(h.under_rate)} of the time (${h.games} games, ${h.total_vs_line > 0 ? "+" : ""}${h.total_vs_line} points vs the line on average${all ? `; all outdoor games: ${pct(all.under_rate)}` : ""}).${c === "snow" && h.games < 30 ? " Small sample." : ""}`);
+    }
+    return `<div class="box"><h2>Game-day weather</h2>
+      <div class="lines">
+        <div class="stat"><div class="k">Temperature</div><div class="v">${w.temp_f}°F</div></div>
+        <div class="stat"><div class="k">Wind</div><div class="v">${w.wind_mph} mph</div>${w.gust_mph > w.wind_mph ? `<div class="s">gusts ${w.gust_mph} mph</div>` : ""}</div>
+        <div class="stat"><div class="k">Precipitation</div><div class="v">${w.precip_prob ?? "–"}%</div><div class="s">chance</div></div>
+      </div>
+      ${flags.length ? `<div class="wx-flags">${flags.map(f => `<span class="pill questionable">${esc(f)}</span>`).join("")}</div>` : ""}
+      ${ctx.map(t => `<p class="muted" style="margin:8px 0 0">${esc(t)}</p>`).join("")}
+      <p class="muted" style="margin:8px 0 0;font-size:12px">Forecast for kickoff and the two hours after, at ${where}, from Open-Meteo, fetched ${esc(w.fetched_at || "")}.${roofNote} Shown next to the total; it is not part of the model's win %.</p></div>`;
   }
 
   // ---- Predictions tab ------------------------------------------------------
@@ -434,7 +514,8 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
       <article class="box sit"><header><h3>Over rate, all teams</h3></header>${betStrip("over_rate", "over_rank", span, hl)}
         <p class="muted" style="margin:6px 0 0">Share of games that went over the total.</p></article></section>`;
     const disc = `<p class="disclaimer">Model estimates are for information only and are not betting advice. Must be 21+ to bet where legal. Gambling problem? Call 1-800-GAMBLER.</p>`;
-    return top + trends + strips + disc;
+    const extra = game ? `<section class="lead">${injuryBox(d, info, { compact: true })}${injuryBox(d, opp, { compact: true })}</section><div style="margin-bottom:12px">${weatherBox(d, game, team)}</div>` : "";
+    return top + extra + trends + strips + disc;
   }
   function modelRecord(preds) {
     if (!preds || !preds.games) return "";
@@ -510,6 +591,7 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
             sh.length ? `<ul class="shift-list">${sh.map(s => `<li><span>${esc(SIT_LABEL[s.sit])}, ${esc(MET_LABEL[s.met])}: ${fmt(s.s.value, s.met)} → ${fmt(s.l.value, s.met)} <span class="muted">(${s.l.n} plays)</span></span><span class="delta">${fmtDiff(s.d, s.met)}</span></li>`).join("")}</ul>`
             : `<p class="muted">No big changes in the last 4 games.</p>`}</div>` : ""}
       </section>
+      ${injuryBox(d, info)}
       <div class="legend">
         <span><svg width="64" height="16" aria-hidden="true"><line x1="2" x2="62" y1="8" y2="8" stroke="var(--rule)"/><circle cx="12" cy="8" r="3.2" fill="var(--dot)"/><circle cx="22" cy="8" r="3.2" fill="var(--dot)"/><line x1="34" x2="34" y1="1" y2="15" stroke="var(--ink)" stroke-width="1.5"/><circle cx="48" cy="8" r="6" fill="${esc(color)}" stroke="var(--ink)" stroke-width="1.5"/></svg>
           Other teams · league average · ${esc(info.nick)}</span>

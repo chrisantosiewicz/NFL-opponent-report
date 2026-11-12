@@ -11,6 +11,7 @@ Every Tuesday during the NFL season, an automated pipeline pulls the latest NFL 
 ```sh
 Rscript run_pipeline.R              # load data, build models, run tests, render CHI's next opponent
 Rscript run_pipeline.R --skip-load  # reuse data/nfl.duckdb (fast while editing SQL)
+Rscript run_pipeline.R --update     # refresh the published week: injuries, lines, weather
 Rscript run_pipeline.R --no-render  # stop after the data tests
 Rscript run_pipeline.R --date=2026-12-15            # as if today were Dec 15
 Rscript run_pipeline.R --opponent=GB --week=16      # one specific matchup
@@ -48,7 +49,7 @@ Needs R, Quarto, and the packages in `DESCRIPTION` (pinned in `renv.lock`: run `
 | Elo and predictions | `sql/models/32_elo_ratings.sql`, `33_game_predictions.sql`, `export_predictions()` | Elo v1 ratings since 2017, each game's model win %, locked in `site/data/predictions-<season>.json` and graded after the game |
 | Betting trends | `sql/models/34_betting_trends.sql` | ATS, straight-up and over/under records per team, season and last 4, home / away / favorite / underdog, with league ranks |
 | Live page | `site/scout.html` | interactive scout: any team, Scouting and Predictions tabs, season or last 4, 32-team strips; staff notes from `site/notes/` |
-| Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, publish to Pages |
+| Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, Thursday/Saturday/Sunday/Monday morning updates (injuries, lines, weather), publish to Pages |
 
 If any step fails in GitHub Actions, nothing is published, so the last good report stays live and GitHub emails the failure.
 

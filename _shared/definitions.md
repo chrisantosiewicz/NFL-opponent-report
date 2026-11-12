@@ -36,6 +36,22 @@ Implemented in `sql/models/07_stg_market_lines.sql`, `32_elo_ratings.sql`, `33_g
 | Lock | A game's win % is locked in `site/data/predictions-<season>.json` the first time a run sees it in the report week before game day, and never rewritten. Grades (right/wrong, log loss vs the market) use the final score; ties are not graded. |
 | Trends | ATS, straight-up and over/under records against each game's closing line, over the same windows as the tendencies (games before the week; season and last 4). A push is its own column. Fewer than 4 games is marked small. |
 
+## Injuries and game-day weather (added Nov 11, 2026)
+
+Implemented in `sql/models/08_stg_injuries.sql`, `35_injury_report.sql` and `36_game_weather.sql`.
+
+| Item | Definition |
+|------|-----------|
+| Injury report | nflverse `load_injuries()`: the latest version of each week's official report. A game's report is the week's own once the team files one; before that (e.g. the Tuesday run) the team's latest earlier report, labeled as such. |
+| Listed | A game status (Out, Doubtful, Questionable) or a practice day that was not full (DNP, Limited). Full practice with no status = healthy, not listed. |
+| Starter | Averaged 50%+ of offensive or defensive snaps in the games he played among the team's last 4 completed games before this one. |
+| Injury flag | Count of listed starters: Out or Doubtful = "out", Questionable = "questionable". Shown on each team in the matchup bar. |
+| New | On this report but not on the team's previous week's report. |
+| Forecast | Open-Meteo hourly forecast at the stadium (`config/stadiums.csv`), averaged temperature and highest wind, gust and precipitation chance over the kickoff hour and the two after. Fetched for games in the next 7 days on every run. |
+| Indoor | Schedule roof `dome` or `closed`, or a fixed-roof stadium when the schedule leaves it blank: weather neutral, no flags. A retractable roof the schedule hasn't set is treated as outdoor, with a note. |
+| Weather flags | Windy = 15+ mph sustained; cold = 32F or colder; wet = 50%+ precipitation chance. |
+| Weather context | Completed outdoor games since 2017 with the schedule's recorded kickoff temperature and wind: share that went under the closing total, for windy, cold, rain and snow games. Rain/snow = the gamebook's kickoff sky description names it (not "chance of rain"); 2017-2023 from `reference/gamebook_weather_2017_2023.csv`, later seasons from play-by-play. The page shows rain or snow history when the forecast is wet (snow at 34F or below). Context next to the total, not a model input. |
+
 ## Trades during the season
 
 nflverse's trade feed can lag by months (on Oct 30, 2026 its newest trade was from April), so the check has two other sources:
