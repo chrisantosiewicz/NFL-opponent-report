@@ -17,6 +17,9 @@ PBP_COLUMNS <- c(
   # depth of the target, for the top-receiver model (deep = 20+ air yards),
   # and yards gained, for production allowed by position on defense
   "air_yards", "yards_gained",
+  # completions and touchdowns, for the player trends behind the prop angles
+  # on the attack view (22_player_trends.sql)
+  "complete_pass", "pass_touchdown", "rush_touchdown",
   # where the play went: run lane (left/middle/right x end/tackle/guard) and
   # pass area (left/middle/right x short/deep), for play_direction
   "run_location", "run_gap", "pass_location", "pass_length",
@@ -39,6 +42,15 @@ ROSTER_COLUMNS <- c("season", "week", "game_type", "team", "status", "full_name"
 INJURY_COLUMNS <- c("season", "game_type", "team", "week", "gsis_id", "position", "full_name",
                     "report_primary_injury", "report_status", "practice_primary_injury",
                     "practice_status")
+# FTN charting (in season, within 48 hours of each game): blitzers, pass
+# rushers, box count and play action per play, for the attack plan's coverage
+# box (sql/models/09_stg_charting.sql). Attribution: FTN Data via nflverse.
+FTN_COLUMNS <- c("nflverse_game_id", "nflverse_play_id", "n_blitzers", "n_pass_rushers",
+                 "n_defense_box", "is_play_action")
+# Participation for last season only: man/zone and coverage shell per play.
+# FTN releases it after the postseason, so the current season has none.
+PARTICIPATION_COLUMNS <- c("nflverse_game_id", "play_id", "defense_man_zone_type",
+                           "defense_coverage_type")
 # Hourly forecast rows for upcoming games (fetch_weather()); times are US Eastern.
 WEATHER_COLUMNS <- c("game_id", "time", "temp_f", "wind_mph", "gust_mph", "precip_prob",
                      "precip_in", "fetched_at")
@@ -74,7 +86,10 @@ load_raw_data <- function(con, seasons) {
     load_side_feed(con, "raw_snap_counts", SNAP_COLUMNS, function() nflreadr::load_snap_counts(seasons)),
     load_side_feed(con, "raw_players", PLAYER_COLUMNS, function() nflreadr::load_players()),
     load_side_feed(con, "raw_rosters_weekly", ROSTER_COLUMNS, function() nflreadr::load_rosters_weekly(seasons)),
-    load_side_feed(con, "raw_injuries", INJURY_COLUMNS, function() nflreadr::load_injuries(seasons))
+    load_side_feed(con, "raw_injuries", INJURY_COLUMNS, function() nflreadr::load_injuries(seasons)),
+    load_side_feed(con, "raw_ftn_charting", FTN_COLUMNS, function() nflreadr::load_ftn_charting(seasons)),
+    load_side_feed(con, "raw_participation", PARTICIPATION_COLUMNS,
+                   function() nflreadr::load_participation(max(seasons) - 1))
   )
   dbWriteTable(con, "raw_feed_status", feeds, overwrite = TRUE)
   message(sprintf("raw_pbp: %s plays, raw_schedules: %s games",
@@ -466,6 +481,34 @@ render_report <- function(game, db_path = "data/nfl.duckdb", out_dir = "site/rep
   print_pdf(html)
   message("rendered ", html)
   slug
+}
+
+# One-pagers for every team in the live page's week, so any fan can print one
+# from the scouting page: each offense, scouted for the team it plays. They go
+# to site/reports/teams/ (the Bears archive in site/reports/ is untouched) and
+# only this week's are kept, so the repo doesn't grow by 32 files a week.
+# `games` is one row per team per game (stg_team_games); each row renders its
+# opponent, like render_report(). Rows in `skip` (already rendered for the
+# archive) are left out. One failed render is a warning, not a stopped run.
+render_league_reports <- function(games, db_path = "data/nfl.duckdb", skip = NULL,
+                                  out_dir = "site/reports/teams") {
+  if (nrow(games) == 0) return(invisible(character()))
+  key <- function(g) paste(g$season, g$week, g$team, g$opponent)
+  if (!is.null(skip) && nrow(skip) > 0) games <- games[!key(games) %in% key(skip), ]
+  want <- report_slug(games$season, games$week, games$opponent)
+  dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+  old <- list.files(out_dir, pattern = "\\.(html|pdf)$", full.names = TRUE)
+  unlink(old[!sub("\\.(html|pdf)$", "", basename(old)) %in% want])
+  done <- character()
+  for (i in seq_len(nrow(games))) {
+    slug <- tryCatch(render_report(games[i, ], db_path, out_dir), error = function(e) {
+      warn_run(conditionMessage(e), title = "Team one-pager")
+      NA_character_
+    })
+    done <- c(done, slug)
+  }
+  message(sprintf("team one-pagers: %d of %d rendered in %s", sum(!is.na(done)), nrow(games), out_dir))
+  invisible(done[!is.na(done)])
 }
 
 # PDF = the same HTML printed by headless Chrome, so both formats match.

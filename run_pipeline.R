@@ -7,6 +7,7 @@
 #   Rscript run_pipeline.R --team=DET         # scout DET's next opponent instead
 #   Rscript run_pipeline.R --opponent=GB --week=16   # render one specific matchup for the team
 #   Rscript run_pipeline.R --update           # midweek refresh: injuries, lines, weather only
+#   Rscript run_pipeline.R --focal-only       # skip the one-pagers for every other team
 
 source("R/pipeline.R")
 
@@ -94,6 +95,15 @@ export_site_data(con, games$season[1], games$week[1], team)
 export_report_cards(con, games$season[1])
 export_predictions(con, games$season[1], games$week[1], run_date)
 
+# Every game in the live page's week (the league's current week), for the
+# one-pager each team's scouting page links to. Read now, before the
+# connection closes.
+league_games <- if (nrow(league) == 1 && !isTRUE(arg("focal-only", FALSE))) {
+  dbGetQuery(con, "SELECT game_id, season, week, game_type, gameday, team, opponent, is_home
+                   FROM stg_team_games WHERE season = ? AND week = ?
+                   ORDER BY gameday, game_id, is_home", params = list(league$season, league$week))
+} else NULL
+
 # Close the write connection so Quarto can open the database read-only.
 dbDisconnect(con, shutdown = TRUE)
 on.exit()
@@ -104,6 +114,7 @@ for (i in seq_len(nrow(games))) {
                   games$season[i], games$week[i], format(games$gameday[i])))
   slugs <- c(slugs, render_report(games[i, ], db_path))
 }
+if (!is.null(league_games)) render_league_reports(league_games, db_path, skip = games)
 # Feature the report rendered first: the focal team's game, or the earliest
 # game of the week in the playoff fallback.
 build_site(latest = slugs[1])
