@@ -54,7 +54,7 @@ Implemented in `sql/models/08_stg_injuries.sql`, `35_injury_report.sql` and `36_
 
 ## Attack plan and player trends (added Nov 15, 2026)
 
-Implemented in `sql/models/22_player_trends.sql`; the attack plan on `site/scout.html` also reads `24_defense_vs_position`, `25_team_yards` and `26_play_direction`.
+Implemented in `sql/models/22_player_trends.sql`, `09_stg_charting.sql` and `37_coverage_matchup.sql`; the attack plan on `site/scout.html` also reads `24_defense_vs_position`, `25_team_yards` and `26_play_direction`.
 
 | Item | Definition |
 |------|-----------|
@@ -63,6 +63,9 @@ Implemented in `sql/models/22_player_trends.sql`; the attack plan on `site/scout
 | Player picks | Per team: the QB with the most passing yards, the 2 backs with the most carries, the 4 WR/TE with the most targets, season to date. |
 | Player stats | From play-by-play: receiving = targets, catches, yards on catches; rushing = every carry with a rusher listed, scrambles included; passing = completions and yards on them. Per-game = over the games the player had a stat. Can differ slightly from official box scores. |
 | Prop trends | Averages and last 4 game logs next to what the opponent allows. No prop lines; not a pick. |
+| Blitz | FTN charting: 1+ blitzer on a dropback. Blitz rate = blitzes / charted dropbacks; ranks need 30+ charted dropbacks. |
+| Heavy box | FTN charting: 8+ defenders in the box at the snap on a designed run. |
+| Man / zone | nflverse participation (FTN), last season only: it is published after the postseason, so the current season has none. Shown labeled with its season. |
 
 ## Trades during the season
 

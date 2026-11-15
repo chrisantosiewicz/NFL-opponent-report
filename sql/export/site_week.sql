@@ -152,6 +152,33 @@ COPY (
          FROM player_trends
          WHERE season = {{season}} AND as_of_week = {{week}}) AS players,
 
+        -- Coverage on the attack plan (37_coverage_matchup.sql): blitz, box
+        -- and play action this season (FTN charting), man/zone last season.
+        (SELECT list({team: team, side: side, dropbacks: dropbacks,
+                      blitz_rate: round(blitz_rate, 3), blitz_rank: blitz_rank,
+                      blitz_epa: round(blitz_epa, 3), noblitz_epa: round(noblitz_epa, 3),
+                      blitz_epa_rank: blitz_epa_rank, blitzes: blitzes,
+                      avg_rushers: round(avg_rushers, 2),
+                      heavy_box_rate: round(heavy_box_rate, 3), heavy_box_rank: heavy_box_rank,
+                      heavy_box_epa: round(heavy_box_epa, 3), runs: runs,
+                      pa_rate: round(pa_rate, 3), pa_epa: round(pa_epa, 3), teams: teams,
+                      league_blitz_rate: round(league_blitz_rate, 3),
+                      league_blitz_epa: round(league_blitz_epa, 3), league_noblitz_epa: round(league_noblitz_epa, 3),
+                      ly_dropbacks: ly_dropbacks, ly_man_rate: round(ly_man_rate, 3),
+                      ly_zone_rate: round(ly_zone_rate, 3), ly_man_epa: round(ly_man_epa, 3),
+                      ly_zone_epa: round(ly_zone_epa, 3), ly_top_coverage: ly_top_coverage,
+                      ly_top_coverage_share: round(ly_top_coverage_share, 3)})
+         FROM coverage_team
+         WHERE season = {{season}} AND as_of_week = {{week}})  AS coverage,
+
+        (SELECT list({team: team, player: player_name, position: position,
+                      blitz_targets: blitz_targets, blitz_yards: blitz_yards, blitz_epa: round(blitz_sum_epa, 2),
+                      noblitz_targets: noblitz_targets, noblitz_yards: noblitz_yards, noblitz_epa: round(noblitz_sum_epa, 2),
+                      ly_man_targets: ly_man_targets, ly_man_yards: ly_man_yards, ly_man_epa: round(ly_man_sum_epa, 2),
+                      ly_zone_targets: ly_zone_targets, ly_zone_yards: ly_zone_yards, ly_zone_epa: round(ly_zone_sum_epa, 2)})
+         FROM coverage_players
+         WHERE season = {{season}} AND as_of_week = {{week}})  AS coverage_players,
+
         -- "What stands out" picks, same rule as the one-pager.
         (SELECT list({team: team, priority: priority, situation: situation, metric: metric}
                      ORDER BY team, priority)

@@ -50,6 +50,7 @@ Needs R, Quarto, and the packages in `DESCRIPTION` (pinned in `renv.lock`: run `
 | Elo and predictions | `sql/models/32_elo_ratings.sql`, `33_game_predictions.sql`, `export_predictions()` | Elo v1 ratings since 2017, each game's model win %, locked in `site/data/predictions-<season>.json` and graded after the game |
 | Betting trends | `sql/models/34_betting_trends.sql` | ATS, straight-up and over/under records per team, season and last 4, home / away / favorite / underdog, with league ranks |
 | Player trends | `sql/models/22_player_trends.sql` | each team's QB, top 2 backs and top 4 WR/TE: per-game receiving, rushing and passing, season and last 4, last 4 game logs, for the prop angles on the attack plan |
+| Coverage | `sql/models/09_stg_charting.sql`, `37_coverage_matchup.sql` | blitz rate, box count and play action this season (FTN charting via nflverse), man/zone and coverage shell last season (participation), for teams and their top receivers and backs |
 | Live page | `site/scout.html` | interactive scout: any team, Attack plan, Scouting and Predictions tabs, season or last 4, 32-team strips; staff notes from `site/notes/` |
 | Automation | `.github/workflows/weekly-report.yml` | Tuesday run, Wednesday retry, Thursday/Saturday/Sunday/Monday morning updates (injuries, lines, weather), publish to Pages |
 

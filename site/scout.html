@@ -222,7 +222,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
 
 <footer class="wrap">
   <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. The win chance is a model estimate from an Elo rating (every team's strength, updated after each game, with home field and rest after a bye) and is shown next to the market's chance from the moneylines with the bookmaker's margin removed. Only win chances are shown: the model has not shown an edge against the spread or on totals. Trend records count each game against its closing line. Only games before this week are used.</p>
-  <p id="how-attack" hidden><strong>How to read this.</strong> The attack plan puts one offense next to the defense it faces this week. Run sides and pass areas are from the offense's view (left, middle, right of the offense) on both sides, using neutral downs (win probability 5-95%). A defense's rank of 1 means it allows the most EPA per play there; "soft spot" is the worst quarter of the league, "tough" the best quarter. Player trends come from the play-by-play, so they can differ slightly from official box scores, and per-game averages use the games the player played. They are trends, not prop picks: there are no prop lines here and nothing is betting advice. Only games before this week are used.</p>
+  <p id="how-attack" hidden><strong>How to read this.</strong> The attack plan puts one offense next to the defense it faces this week. Run sides and pass areas are from the offense's view (left, middle, right of the offense) on both sides, using neutral downs (win probability 5-95%). A defense's rank of 1 means it allows the most EPA per play there; "soft spot" is the worst quarter of the league, "tough" the best quarter. Player trends come from the play-by-play, so they can differ slightly from official box scores, and per-game averages use the games the player played. They are trends, not prop picks: there are no prop lines here and nothing is betting advice. Blitz, box and play action are this season's FTN charting; man/zone is last season's, the latest public. Only games before this week are used.</p>
   <p id="how-scout"><strong>How to read this.</strong> Every dot is one NFL team, ranked on the same plays. The big dot is the team you picked, the dark line is the league average. Pass rate counts sacks and scrambles as passes. Pass rate over expected compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse xpass model). EPA is expected points added per play; above 0 helps the offense. Early downs, 3rd down, red zone and all neutral use only plays with the offense's win probability between 5% and 95%; 2-minute and trailing by 8+ use every play. Numbers on fewer than 30 plays are greyed and marked * and never make "What stands out". Only games before this week are used.</p>
   <p id="foot-meta"></p>
 </footer>
@@ -691,6 +691,32 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
       <tbody>${lines.map(l => `<tr><td>${l[0]}</td><td><b>${l[1]}</b></td><td>${l[2] || ""}</td><td class="muted">${l[3]}</td></tr>`).join("")}</tbody></table>
       ${vs ? `<p class="vs">${vs}</p>` : ""}</article>`;
   }
+  function coverageBox(d, team, info, oppInfo) {
+    const cov = (d.coverage || []);
+    const def = cov.find(r => r.team === oppInfo.team && r.side === "defense");
+    const off = cov.find(r => r.team === team && r.side === "offense");
+    if (!def && !off) return "";
+    const pc = v => v == null ? "–" : Math.round(100 * v) + "%";
+    const shell = c => String(c || "").replace(/^COVER_/, "Cover ").replace("2_MAN", "2-Man").replace(/_/g, " ").toLowerCase().replace(/^\w/, x => x.toUpperCase());
+    const stats = [];
+    if (def && def.blitz_rate != null) stats.push(`<div class="stat"><div class="k">Blitz rate</div><div class="v">${pc(def.blitz_rate)}</div><div class="s">${def.blitz_rank ? `${ord(def.blitz_rank)}-most · ` : ""}league ${pc(def.league_blitz_rate)}</div></div>`);
+    if (def && def.heavy_box_rate != null) stats.push(`<div class="stat"><div class="k">8+ in the box</div><div class="v">${pc(def.heavy_box_rate)}</div><div class="s">of runs${def.heavy_box_rank ? ` · ${ord(def.heavy_box_rank)}-most` : ""}</div></div>`);
+    if (def && def.ly_man_rate != null) stats.push(`<div class="stat"><div class="k">Man / zone <span class="est">${d.season - 1}</span></div><div class="v">${pc(def.ly_man_rate)} / ${pc(def.ly_zone_rate)}</div><div class="s">${def.ly_top_coverage ? `most used: ${esc(shell(def.ly_top_coverage))} (${pc(def.ly_top_coverage_share)})` : ""}</div></div>`);
+    const lines = [];
+    if (def && def.blitz_epa != null) lines.push(`When the ${esc(oppInfo.nick)} blitz they allow <b>${sgn(def.blitz_epa)}</b> EPA per dropback${def.blitz_epa_rank ? ` (${ord(def.blitz_epa_rank)}-most)` : ""}, ${sgn(def.noblitz_epa)} when they don't (league ${sgn(def.league_blitz_epa)} / ${sgn(def.league_noblitz_epa)}).`);
+    if (off && off.blitz_epa != null) lines.push(`The ${esc(info.nick)} offense: <b>${sgn(off.blitz_epa)}</b> EPA per dropback vs the blitz${off.blitz_epa_rank ? ` (${ord(off.blitz_epa_rank)} of ${off.teams})` : ""}, ${sgn(off.noblitz_epa)} without one. Play action on ${pc(off.pa_rate)} of dropbacks at ${sgn(off.pa_epa)} EPA.`);
+    if (off && off.ly_man_epa != null && def && def.ly_man_epa != null) lines.push(`Last season: the ${esc(info.nick)} offense had ${sgn(off.ly_man_epa)} EPA per dropback vs man and ${sgn(off.ly_zone_epa)} vs zone; the ${esc(oppInfo.nick)} defense allowed ${sgn(def.ly_man_epa)} in man and ${sgn(def.ly_zone_epa)} in zone.`);
+    const MINT = 10;
+    const split = (t, y) => !t ? `<td class="small">–</td>` : `<td class="${t < MINT ? "small" : ""}"><b>${(y / t).toFixed(1)}</b><small>${t} targets</small></td>`;
+    const ps = (d.coverage_players || []).filter(r => r.team === team && (r.blitz_targets + r.noblitz_targets + r.ly_man_targets + r.ly_zone_targets) > 0);
+    const table = ps.length ? `<table class="h2h"><thead><tr><th>Yards per target</th><th>vs blitz</th><th>no blitz</th><th>vs man <span class="est">${d.season - 1}</span></th><th>vs zone <span class="est">${d.season - 1}</span></th></tr></thead><tbody>
+      ${ps.map(r => `<tr><td>${esc(r.player)} <span class="muted">${esc(r.position || "")}</span></td>${split(r.blitz_targets, r.blitz_yards)}${split(r.noblitz_targets, r.noblitz_yards)}${split(r.ly_man_targets, r.ly_man_yards)}${split(r.ly_zone_targets, r.ly_zone_yards)}</tr>`).join("")}</tbody></table>` : "";
+    return `<div class="box" style="margin-top:4px"><h2>Coverage: how the ${esc(oppInfo.nick)} defend the pass</h2>
+      ${stats.length ? `<div class="lines">${stats.join("")}</div>` : ""}
+      ${lines.map(l => `<p style="margin:10px 0 0">${l}</p>`).join("")}
+      ${table ? `<div style="margin-top:12px;overflow-x:auto">${table}</div>` : ""}
+      <p class="muted" style="margin:8px 0 0">Blitz, box and play action: this season, from FTN's charting (posted within 48 hours of each game). Man/zone: <b>last season</b> (${d.season - 1}), the latest public; it was last year's roster and coordinator. Man/zone splits for players are from wherever they played last year. <b style="color:var(--warn)">*</b> fewer than ${MINT} targets. Charting: FTN Data via nflverse.</p></div>`;
+  }
   function attackHtml(d, team, info, game, notes) {
     if (!game) return `<div class="box" style="margin-top:12px"><h2>Bye week</h2><p class="muted">The ${esc(info.nick)} don't play this week. The Scouting tab still has their tendencies.</p></div>`;
     const oppInfo = d.teamInfo.get(game.opponent);
@@ -702,6 +728,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
       ${notes ? `<div class="box notes" style="margin-top:12px"><h2>Where to attack the ${esc(oppInfo.nick)}</h2>${notesHtml(notes)}</div>` : ""}
       <section class="lead">${runTable(d, team, info, game.opponent, oppInfo)}${positionBox(d, oppInfo)}</section>
       ${passGrid(d, team, info, game.opponent, oppInfo)}
+      ${coverageBox(d, team, info, oppInfo)}
       <h2 class="sec">Player trends for props</h2>
       <p class="muted" style="margin:0 0 8px">Per-game averages next to what the ${esc(oppInfo.nick)} allow. Trends only: no prop lines here, and not betting advice.</p>
       <section class="grid">${players.map(p => propCard(d, p, oppInfo)).join("") || `<p class="muted">No player data yet.</p>`}</section>`;

@@ -42,6 +42,15 @@ ROSTER_COLUMNS <- c("season", "week", "game_type", "team", "status", "full_name"
 INJURY_COLUMNS <- c("season", "game_type", "team", "week", "gsis_id", "position", "full_name",
                     "report_primary_injury", "report_status", "practice_primary_injury",
                     "practice_status")
+# FTN charting (in season, within 48 hours of each game): blitzers, pass
+# rushers, box count and play action per play, for the attack plan's coverage
+# box (sql/models/09_stg_charting.sql). Attribution: FTN Data via nflverse.
+FTN_COLUMNS <- c("nflverse_game_id", "nflverse_play_id", "n_blitzers", "n_pass_rushers",
+                 "n_defense_box", "is_play_action")
+# Participation for last season only: man/zone and coverage shell per play.
+# FTN releases it after the postseason, so the current season has none.
+PARTICIPATION_COLUMNS <- c("nflverse_game_id", "play_id", "defense_man_zone_type",
+                           "defense_coverage_type")
 # Hourly forecast rows for upcoming games (fetch_weather()); times are US Eastern.
 WEATHER_COLUMNS <- c("game_id", "time", "temp_f", "wind_mph", "gust_mph", "precip_prob",
                      "precip_in", "fetched_at")
@@ -77,7 +86,10 @@ load_raw_data <- function(con, seasons) {
     load_side_feed(con, "raw_snap_counts", SNAP_COLUMNS, function() nflreadr::load_snap_counts(seasons)),
     load_side_feed(con, "raw_players", PLAYER_COLUMNS, function() nflreadr::load_players()),
     load_side_feed(con, "raw_rosters_weekly", ROSTER_COLUMNS, function() nflreadr::load_rosters_weekly(seasons)),
-    load_side_feed(con, "raw_injuries", INJURY_COLUMNS, function() nflreadr::load_injuries(seasons))
+    load_side_feed(con, "raw_injuries", INJURY_COLUMNS, function() nflreadr::load_injuries(seasons)),
+    load_side_feed(con, "raw_ftn_charting", FTN_COLUMNS, function() nflreadr::load_ftn_charting(seasons)),
+    load_side_feed(con, "raw_participation", PARTICIPATION_COLUMNS,
+                   function() nflreadr::load_participation(max(seasons) - 1))
   )
   dbWriteTable(con, "raw_feed_status", feeds, overwrite = TRUE)
   message(sprintf("raw_pbp: %s plays, raw_schedules: %s games",
