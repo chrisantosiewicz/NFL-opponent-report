@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Bears Opponent Scout</title>
+<title>NFL Opponent Scout</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,7 +30,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
 .bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--card); border-bottom: 1px solid var(--rule); }
 .bar .wrap { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding-block: 10px; }
-.brand { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.04em; text-transform: uppercase; margin-right: auto; }
+.brand { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.04em; text-transform: uppercase; margin-right: auto; color: inherit; text-decoration: none; }
 .brand b { color: var(--accent); }
 .ctl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 select, .seg button { font: 500 13px var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px; }
@@ -112,6 +112,17 @@ footer a { color: inherit; }
 .side .role { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .side.scouted { border: 2px solid var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
 .side.scouted .role { color: var(--accent); }
+.side .lg { width: 34px; height: 34px; object-fit: contain; flex: none; }
+a.side { text-decoration: none; color: inherit; }
+a.side:hover { border-color: var(--c); }
+a.side .role::after { content: " · scout them"; text-transform: none; letter-spacing: 0; font-weight: 500; }
+/* "Want a one-pager?": the print report for the team on screen. */
+.onepager { margin-left: auto; display: flex; align-items: center; gap: 12px; background: var(--hi); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 8px; padding: 8px 12px; max-width: 360px; }
+.onepager .q { font-weight: 600; font-size: 13px; }
+.onepager .s { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.onepager .go { display: flex; gap: 10px; white-space: nowrap; }
+.onepager .go a { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; }
+.onepager .go a:hover { text-decoration: underline; }
 .at { align-self: center; color: var(--muted); font-weight: 600; }
 .subject { font-size: 16px; font-weight: 600; }
 .subject b { box-shadow: inset 0 -3px 0 var(--team, var(--accent)); }
@@ -159,6 +170,9 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
   .lines { grid-template-columns: minmax(0, 1fr); }
   .lead, .grid { grid-template-columns: minmax(0, 1fr); }
   .brand { width: 100%; }
+  /* On a phone the wrapped control bar is a third of the screen: let it scroll away. */
+  .bar { position: static; }
+  .onepager { margin-left: 0; max-width: none; width: 100%; justify-content: space-between; }
 }
 @media (max-width: 420px) {
   .row { grid-template-columns: minmax(72px, 1fr) 62px minmax(70px, 1.3fr) 40px; gap: 6px; }
@@ -169,7 +183,7 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
 <body>
 
 <div class="bar"><div class="wrap">
-  <div class="brand">Bears <b>Opponent</b> Scout</div>
+  <a class="brand" href="./" id="brand" title="Pick your team">Bears <b>Opponent</b> Scout</a>
   <nav class="views" aria-label="Views"><a href="scout.html" aria-current="page">Live scouting</a><a href="archive.html" id="archive-link">Archive</a></nav>
   <label class="ctl" for="team">Scouting
     <select id="team"></select></label>
@@ -214,7 +228,10 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
   const MET_LABEL = Object.fromEntries(MET.map(m => [m[0], m[1]]));
   const MIN_N = 30;
   const embedded = window.SCOUT_DATA || null;
-  const state = { data: null, index: null, team: null, span: "season", noteSide: "defense", view: "scouting", preds: new Map() };
+  const state = { data: null, index: null, team: null, span: "season", noteSide: "defense", view: "scouting", preds: new Map(),
+    // ?for=GB: the fan's team (from the home page's team picker). Without it,
+    // the page is the Bears' scout, as before.
+    fan: (new URLSearchParams(location.search).get("for") || "").toUpperCase() };
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -255,6 +272,12 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
     return { ...d, byKey, league, last, fallback, teamInfo: new Map(d.teams.map(t => [t.team, t])) };
   }
   const get = (team, sit, span, met) => state.data.byKey.get(`${team}|${sit}|${span}|${met}`);
+  // The team this page is for (the fan's pick, else the Bears) and its opponent this week.
+  function focalOf(d) {
+    const team = d.teamInfo.has(state.fan) ? state.fan : d.focal_team;
+    const g = (d.games || []).find(x => x.team === team);
+    return { team, opp: g ? g.opponent : null };
+  }
 
   function strip(team, sit, span, met, color) {
     const all = state.data.league.get(`${sit}|${span}|${met}`) || [];
@@ -336,15 +359,18 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
   // ---- Header: who is being scouted, for whom, and the two tabs ----------
   const dayOf = g => new Date(g.gameday + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
   function sideHtml(t, role, scouted, badge = "") {
-    return `<div class="side${scouted ? " scouted" : ""}" style="--c:${esc(t.color || "#888")}"><span class="sw"></span>
-      <div><div class="role">${esc(role)}</div><div class="nm">${esc(t.nick)}</div>${badge}</div></div>`;
+    const mark = t.logo ? `<img class="lg" src="${esc(t.logo)}" alt="" onerror="this.outerHTML='<span class=&quot;sw&quot;></span>'">` : `<span class="sw"></span>`;
+    const inner = `${mark}<div><div class="role">${esc(role)}</div><div class="nm">${esc(t.nick)}</div>${badge}</div>`;
+    // The other side of the matchup is a link: one tap scouts them instead.
+    return scouted ? `<div class="side scouted" style="--c:${esc(t.color || "#888")}">${inner}</div>`
+      : `<a class="side" href="#${esc(t.team)}${state.view === "predictions" ? "/predictions" : ""}" style="--c:${esc(t.color || "#888")}" title="Scout the ${esc(t.nick)}">${inner}</a>`;
   }
-  function headerHtml(d, team, info, game, focal, isFocalOpp, pdf, backToOpp) {
+  function headerHtml(d, team, info, game, focal, isFocalOpp, onePager, backToOpp) {
     const focalNick = focal ? focal.nick : "Bears";
     let bar = sideHtml(info, "Scouting", true, injuryBadge(d, team)), when = `Week ${d.week} · no game (bye)`;
     if (game) {
       const opp = d.teamInfo.get(game.opponent) || { nick: game.opponent, color: "#888" };
-      const oppRole = game.opponent === d.focal_team ? "Us" : "Opponent";
+      const oppRole = focal && game.opponent === focal.team ? (state.fan ? "Your team" : "Us") : "Opponent";
       const me = sideHtml(info, "Scouting", true, injuryBadge(d, team)), them = sideHtml(opp, oppRole, false, injuryBadge(d, game.opponent));
       bar = game.is_home ? `${them}<span class="at">at</span>${me}` : `${me}<span class="at">at</span>${them}`;
       when = `Week ${d.week} · ${dayOf(game)}`;
@@ -355,10 +381,10 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
       : `Scouting the <b>${esc(info.nick)}</b>' offense <span class="muted">(not this week's ${esc(focalNick)} opponent)</span>`;
     const tab = (v, label) => `<a href="#${esc(team)}${v === "predictions" ? "/predictions" : ""}" data-view="${v}"${state.view === v ? ' aria-current="page"' : ""}>${label}</a>`;
     return `<header class="top">
-        <div class="matchbar">${bar}</div>
+        <div class="matchbar">${bar}${onePager}</div>
         <div class="subject">${subject}</div>
         <div class="when">${esc(when)}${isFocalOpp ? ` · <span style="color:var(--accent)">${esc(focalNick)}’ next opponent</span>` : ""}</div>
-        <div class="quick">${pdf}${backToOpp}</div>
+        ${backToOpp ? `<div class="quick">${backToOpp}</div>` : ""}
         <nav class="tabs" aria-label="View">${tab("scouting", "Scouting")}${tab("predictions", "Predictions")}</nav>
       </header>`;
   }
@@ -528,10 +554,29 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
       Log loss ${ll(g.map(x => x.model_log_loss)).toFixed(3)}${gm.length ? ` vs the market's ${ll(gm.map(x => x.market_log_loss)).toFixed(3)}` : ""} (lower is better). ${esc(preds.model_settings || "")}</p>`;
   }
 
+  // The print one-pager for the team on screen, if this week has one: the
+  // Bears' opponent's is in the archive (reports/), every other team's in
+  // reports/teams/ (current week only). Checked with HEAD, so the box only
+  // shows when the file is there.
+  const reportCache = new Map();
+  const exists = async url => { try { return (await fetch(url, { method: "HEAD", cache: "no-cache" })).ok; } catch { return false; } };
+  async function findOnePager(d, team, slug) {
+    if (embedded) return null;
+    if (!reportCache.has(slug)) reportCache.set(slug, (async () => {
+      const dirs = team === d.focal_opponent ? ["reports/"] : ["reports/teams/", "reports/"];
+      for (const dir of dirs) {
+        const html = `${dir}${slug}.html`;
+        if (await exists(html)) return { html, pdf: await exists(`${dir}${slug}.pdf`) ? `${dir}${slug}.pdf` : null };
+      }
+      return null;
+    })());
+    return reportCache.get(slug);
+  }
+
   async function render() {
     const d = state.data, team = state.team, span = state.span;
     const info = d.teamInfo.get(team) || { name: team, nick: team, color: "#888" };
-    const focal = d.teamInfo.get(d.focal_team);
+    const F = focalOf(d), focal = d.teamInfo.get(F.team);
     const game = (d.games || []).find(g => g.team === team);
     const anyRow = get(team, "all_neutral", "season", "epa_play");
     const color = info.color;
@@ -539,7 +584,7 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
     const wk = String(d.week).padStart(2, "0");
     const slug = `${d.season}-week${wk}-${team}`;
 
-    const isFocalOpp = team === d.focal_opponent;
+    const isFocalOpp = team === F.opp;
     const asof = d.fallback
       ? `No ${d.season} games yet. Every number below is from the full ${d.season - 1} season.`
       : anyRow ? `Data through Week ${anyRow.through_week} (${anyRow.games} games). Only games before Week ${d.week}. Ranks are among all 32 teams.` : "";
@@ -548,7 +593,7 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
       .map(t => ({ ...t, ...get(team, t.situation, "season", t.metric) }));
     const sh = d.fallback ? [] : shifts(team);
     // Staff notes win; otherwise show the pipeline's generated draft for this offense.
-    let notes = await loadNotes(slug), generated = false;
+    let [notes, report] = await Promise.all([loadNotes(slug), findOnePager(d, team, slug)]), generated = false;
     const draft = (d.drafts || []).filter(r => r.team === team);
     if (!notes && draft.length) {
       generated = true;
@@ -558,12 +603,16 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
     }
     if (state.data !== d || state.team !== team || state.span !== span) return;  // a newer render started
 
-    const pdf = !embedded && isFocalOpp ? `<a href="reports/${slug}.html">Open the print one-pager</a><a href="reports/${slug}.pdf">PDF</a>` : "";
-    const backToOpp = team !== d.focal_opponent && d.focal_opponent ? `<a href="#${esc(d.focal_opponent)}">Back to the ${esc(focal ? focal.nick : "Bears")}' opponent (${esc(d.focal_opponent)})</a>` : "";
+    const forNick = game ? d.teamInfo.get(game.opponent).nick : null;
+    const onePager = report ? `<aside class="onepager" aria-label="One-pager">
+        <div><div class="q">Want a one-pager?</div><div class="s">The ${esc(info.nick)}' offense on one printable page${forNick ? `, scouted for the ${esc(forNick)}` : ""}.</div></div>
+        <div class="go"><a href="${esc(report.html)}">Open</a>${report.pdf ? `<a href="${esc(report.pdf)}">PDF</a>` : ""}</div></aside>` : "";
+    const backToOpp = team !== F.opp && F.opp ? `<a href="#${esc(F.opp)}">Back to the ${esc(focal ? focal.nick : "Bears")}' opponent (${esc(F.opp)})</a>` : "";
 
-    const head = headerHtml(d, team, info, game, focal, isFocalOpp, pdf, backToOpp);
+    const head = headerHtml(d, team, info, game, focal, isFocalOpp, onePager, backToOpp);
     const banner = d.fallback ? "" : span === "last4" ? `<div class="banner">Showing the last 4 games only. Samples are smaller, so more rows are greyed out.</div>` : "";
-    document.title = `Scouting ${team} · Bears Opponent Scout`;
+    document.title = `Scouting ${team} · ${focal ? focal.nick : "Bears"} Opponent Scout`;
+    $("brand").innerHTML = `${esc(focal ? focal.nick : "Bears")} <b>Opponent</b> Scout`;
     $("foot-meta").innerHTML = `Updated ${esc(d.updated)}. Data: <a href="https://github.com/nflverse" target="_blank" rel="noopener">nflverse</a> play-by-play and schedules (nflfastR / nflreadr), openly licensed. Built by Chris Antosiewicz · <a href="https://github.com/chrisantosiewicz/nfl-opponent-report" target="_blank" rel="noopener">source</a>.`;
     $("how-scout").hidden = state.view !== "scouting"; $("how-preds").hidden = state.view !== "predictions";
     if (state.view === "predictions") {
@@ -632,7 +681,7 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
     const h = (h0 || "").toUpperCase();
     const d = state.data;
     if (h && d.teamInfo.has(h)) return h;
-    return d.focal_opponent || (d.games && d.games[0] && d.games[0].team) || d.teams[0].team;
+    return focalOf(d).opp || (d.teamInfo.has(state.fan) && state.fan) || (d.games && d.games[0] && d.games[0].team) || d.teams[0].team;
   }
 
   function setTeam(t) {
@@ -681,7 +730,9 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
       if (embedded) { $("week-wrap").hidden = true; await loadWeek(null); return; }
       state.index = await (await fetch("data/index.json", { cache: "no-cache" })).json();
       const weeks = state.index.weeks || [];
-      $("week").innerHTML = weeks.map(w => `<option value="${esc(w.file)}">${w.season} Week ${w.week}${w.focal_opponent ? ` · ${esc(w.focal_opponent)}` : ` · ${esc(w.focal_team || "")} bye`}</option>`).join("");
+      // The Bears' opponent (or bye) next to each week, unless a fan picked another team.
+      const bearsView = !state.fan || weeks.some(w => w.focal_team === state.fan);
+      $("week").innerHTML = weeks.map(w => `<option value="${esc(w.file)}">${w.season} Week ${w.week}${!bearsView ? "" : w.focal_opponent ? ` · ${esc(w.focal_opponent)}` : ` · ${esc(w.focal_team || "")} bye`}</option>`).join("");
       if (weeks.length < 2) $("week-wrap").hidden = true;
       // ?week=<file> opens an older week (the archive links here); otherwise the
       // league's current week: the earliest one with games still to play today

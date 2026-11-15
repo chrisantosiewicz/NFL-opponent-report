@@ -468,6 +468,34 @@ render_report <- function(game, db_path = "data/nfl.duckdb", out_dir = "site/rep
   slug
 }
 
+# One-pagers for every team in the live page's week, so any fan can print one
+# from the scouting page: each offense, scouted for the team it plays. They go
+# to site/reports/teams/ (the Bears archive in site/reports/ is untouched) and
+# only this week's are kept, so the repo doesn't grow by 32 files a week.
+# `games` is one row per team per game (stg_team_games); each row renders its
+# opponent, like render_report(). Rows in `skip` (already rendered for the
+# archive) are left out. One failed render is a warning, not a stopped run.
+render_league_reports <- function(games, db_path = "data/nfl.duckdb", skip = NULL,
+                                  out_dir = "site/reports/teams") {
+  if (nrow(games) == 0) return(invisible(character()))
+  key <- function(g) paste(g$season, g$week, g$team, g$opponent)
+  if (!is.null(skip) && nrow(skip) > 0) games <- games[!key(games) %in% key(skip), ]
+  want <- report_slug(games$season, games$week, games$opponent)
+  dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+  old <- list.files(out_dir, pattern = "\\.(html|pdf)$", full.names = TRUE)
+  unlink(old[!sub("\\.(html|pdf)$", "", basename(old)) %in% want])
+  done <- character()
+  for (i in seq_len(nrow(games))) {
+    slug <- tryCatch(render_report(games[i, ], db_path, out_dir), error = function(e) {
+      warn_run(conditionMessage(e), title = "Team one-pager")
+      NA_character_
+    })
+    done <- c(done, slug)
+  }
+  message(sprintf("team one-pagers: %d of %d rendered in %s", sum(!is.na(done)), nrow(games), out_dir))
+  invisible(done[!is.na(done)])
+}
+
 # PDF = the same HTML printed by headless Chrome, so both formats match.
 # Skipped (with a message) if no Chrome is installed.
 print_pdf <- function(html) {

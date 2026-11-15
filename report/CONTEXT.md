@@ -13,7 +13,8 @@ One job: render one matchup to HTML and PDF.
 3. Findings are titles; any number under `MIN_N` plays is shown with a red asterisk.
 
 ## Outputs
-- `site/reports/<season>-week<NN>-<OPP>.html` and `.pdf`
+- `site/reports/<season>-week<NN>-<OPP>.html` and `.pdf` (the Bears' opponent; kept in the archive)
+- `site/reports/teams/<season>-week<NN>-<TEAM>.html` and `.pdf`: every other offense in the live page's week, scouted for the team it plays (`render_league_reports()`; only the current week is kept)
 
 ## Check
 A person opens the PDF: it fits on one page and every number has its n.

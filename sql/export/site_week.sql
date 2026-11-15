@@ -16,7 +16,8 @@ COPY (
         '{{updated}}'                                     AS updated,
 
         (SELECT list({team: team, name: team_name, nick: team_nick,
-                      color: color_primary, color2: color_secondary}
+                      color: color_primary, color2: color_secondary,
+                      conference: conference, division: division, logo: logo_url}
                      ORDER BY team)
          FROM dim_team)                                   AS teams,
 

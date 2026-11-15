@@ -13,6 +13,7 @@ Rscript run_pipeline.R              # load data, build models, run tests, render
 Rscript run_pipeline.R --skip-load  # reuse data/nfl.duckdb (fast while editing SQL)
 Rscript run_pipeline.R --update     # refresh the published week: injuries, lines, weather
 Rscript run_pipeline.R --no-render  # stop after the data tests
+Rscript run_pipeline.R --focal-only # skip the one-pagers for the other 31 teams
 Rscript run_pipeline.R --date=2026-12-15            # as if today were Dec 15
 Rscript run_pipeline.R --opponent=GB --week=16      # one specific matchup
 ```

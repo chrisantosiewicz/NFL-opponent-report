@@ -9,5 +9,7 @@ SELECT
     team_conf       AS conference,
     team_division   AS division,
     team_color      AS color_primary,
-    team_color2     AS color_secondary
+    team_color2     AS color_secondary,
+    -- ESPN logo URL from nflverse, for the team picker on the home page.
+    team_logo_espn  AS logo_url
 FROM raw_teams;
