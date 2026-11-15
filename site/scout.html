@@ -221,8 +221,8 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
 <main class="wrap" id="app"><p class="empty">Loading this week's numbers…</p></main>
 
 <footer class="wrap">
-  <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. The win chance is a model estimate from an Elo rating (every team's strength, updated after each game, with home field and rest after a bye) and is shown next to the market's chance from the moneylines with the bookmaker's margin removed. Only win chances are shown: the model has not shown an edge against the spread or on totals. Trend records count each game against its closing line. Only games before this week are used.</p>
-  <p id="how-attack" hidden><strong>How to read this.</strong> The attack plan puts one offense next to the defense it faces this week. Run sides and pass areas are from the offense's view (left, middle, right of the offense) on both sides, using neutral downs (win probability 5-95%). A defense's rank of 1 means it allows the most EPA per play there; "soft spot" is the worst quarter of the league, "tough" the best quarter. Player trends come from the play-by-play, so they can differ slightly from official box scores, and per-game averages use the games the player played. They are trends, not prop picks: there are no prop lines here and nothing is betting advice. Blitz, box and play action are this season's FTN charting; man/zone is last season's, the latest public. Only games before this week are used.</p>
+  <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. The win chance is a model estimate from an Elo rating (every team's strength, updated after each game, with home field and rest after a bye) and is shown next to the market's chance from the moneylines with the bookmaker's margin removed. Only win chances are shown: the model has not shown an edge against the spread or on totals. Trend records count each game against its closing line. Player trends come from the play-by-play, so they can differ slightly from official box scores; per-game averages use the games the player played. They are trends next to what the defense allows, not prop picks: there are no prop lines here. Only games before this week are used.</p>
+  <p id="how-attack" hidden><strong>How to read this.</strong> The attack plan puts one offense next to the defense it faces this week. Run sides and pass areas are from the offense's view (left, middle, right of the offense) on both sides, using neutral downs (win probability 5-95%). A defense's rank of 1 means it allows the most EPA per play there; "soft spot" is the worst quarter of the league, "tough" the best quarter. Blitz, box and play action are this season's FTN charting; man/zone is last season's, the latest public. Only games before this week are used.</p>
   <p id="how-scout"><strong>How to read this.</strong> Every dot is one NFL team, ranked on the same plays. The big dot is the team you picked, the dark line is the league average. Pass rate counts sacks and scrambles as passes. Pass rate over expected compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse xpass model). EPA is expected points added per play; above 0 helps the offense. Early downs, 3rd down, red zone and all neutral use only plays with the offense's win probability between 5% and 95%; 2-minute and trailing by 8+ use every play. Numbers on fewer than 30 plays are greyed and marked * and never make "What stands out". Only games before this week are used.</p>
   <p id="foot-meta"></p>
 </footer>
@@ -571,7 +571,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
         <p class="muted" style="margin:6px 0 0">Share of games that went over the total.</p></article></section>`;
     const disc = `<p class="disclaimer">Model estimates are for information only and are not betting advice. Must be 21+ to bet where legal. Gambling problem? Call 1-800-GAMBLER.</p>`;
     const extra = game ? `<section class="lead">${injuryBox(d, info, { compact: true })}${injuryBox(d, opp, { compact: true })}</section><div style="margin-bottom:12px">${weatherBox(d, game, team)}</div>` : "";
-    return top + extra + trends + strips + disc;
+    return top + extra + trends + strips + propsHtml(d, team, info, game) + disc;
   }
   function modelRecord(preds) {
     if (!preds || !preds.games) return "";
@@ -721,17 +721,24 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
     if (!game) return `<div class="box" style="margin-top:12px"><h2>Bye week</h2><p class="muted">The ${esc(info.nick)} don't play this week. The Scouting tab still has their tendencies.</p></div>`;
     const oppInfo = d.teamInfo.get(game.opponent);
     if (!d.direction) return `<div class="box" style="margin-top:12px"><h2>Attack plan</h2><p class="muted">This week's data was published before the attack plan existed. It fills in with the next update.</p></div>`;
-    const players = (d.players || []).filter(p => p.team === team);
-    const order = { passer: 0, receiver: 1, rusher: 2 };
-    players.sort((a, b) => order[a.role] - order[b.role] || a.role_rank - b.role_rank);
     return `<div class="asof" style="padding-top:10px">Season to date, games before Week ${d.week}. Ranks are among all 32 teams.</div>
       ${notes ? `<div class="box notes" style="margin-top:12px"><h2>Where to attack the ${esc(oppInfo.nick)}</h2>${notesHtml(notes)}</div>` : ""}
       <section class="lead">${runTable(d, team, info, game.opponent, oppInfo)}${positionBox(d, oppInfo)}</section>
       ${passGrid(d, team, info, game.opponent, oppInfo)}
       ${coverageBox(d, team, info, oppInfo)}
-      <h2 class="sec">Player trends for props</h2>
-      <p class="muted" style="margin:0 0 8px">Per-game averages next to what the ${esc(oppInfo.nick)} allow. Trends only: no prop lines here, and not betting advice.</p>
-      <section class="grid">${players.map(p => propCard(d, p, oppInfo)).join("") || `<p class="muted">No player data yet.</p>`}</section>`;
+      <p class="quick" style="margin:12px 0 4px"><a href="#${esc(team)}/predictions">Player trends for props are on the Predictions tab →</a></p>`;
+  }
+  // Player trend cards for the Predictions tab: this team's players vs the defense it plays.
+  function propsHtml(d, team, info, game) {
+    if (!game || !d.players) return "";
+    const oppInfo = d.teamInfo.get(game.opponent);
+    const players = (d.players || []).filter(p => p.team === team);
+    const order = { passer: 0, receiver: 1, rusher: 2 };
+    players.sort((a, b) => order[a.role] - order[b.role] || a.role_rank - b.role_rank);
+    if (!players.length) return "";
+    return `<h2 class="sec">${esc(info.nick)} player trends for props</h2>
+      <p class="muted" style="margin:0 0 8px">Per-game averages next to what the ${esc(oppInfo.nick)} allow. Trends only: no prop lines here, and not betting advice. <a href="#${esc(game.opponent)}/predictions" style="color:var(--accent);font-weight:600;text-decoration:none">${esc(oppInfo.nick)} players →</a></p>
+      <section class="grid">${players.map(p => propCard(d, p, oppInfo)).join("")}</section>`;
   }
 
   // The print one-pager for the team on screen, if this week has one: the
