@@ -43,13 +43,17 @@ run_data_tests(con)
 # They render no report and leave the archive alone.
 if (isTRUE(arg("update", FALSE))) {
   week <- find_update_week(con, run_date)
-  if (nrow(week) == 0) {
+  # Also the league's current week when the focal team is on bye that week.
+  weeks <- unique(rbind(week, find_league_week(con, run_date)))
+  if (nrow(weeks) == 0) {
     message("Update: no published week with games still to play. Nothing to refresh.")
     quit(save = "no", status = 0)
   }
-  export_site_data(con, week$season, week$week, team)
-  export_predictions(con, week$season, week$week, run_date)
-  message(sprintf("Update: refreshed %d week %d", week$season, week$week))
+  for (i in seq_len(nrow(weeks))) {
+    export_site_data(con, weeks$season[i], weeks$week[i], team)
+    export_predictions(con, weeks$season[i], weeks$week[i], run_date)
+    message(sprintf("Update: refreshed %d week %d", weeks$season[i], weeks$week[i]))
+  }
   quit(save = "no", status = 0)
 }
 
@@ -78,7 +82,14 @@ for (i in seq_len(nrow(games))) {
   write_draft_notes(con, games[i, ])
 }
 
-# All 32 teams for the report week, for the live page.
+# All 32 teams for the report week, for the live page. When the focal team is
+# on bye, the league's current week comes first, so the page still has this
+# weekend's games for every other team.
+league <- find_league_week(con, run_date)
+if (nrow(league) == 1 && (league$season != games$season[1] || league$week != games$week[1])) {
+  export_site_data(con, league$season, league$week, team)
+  export_predictions(con, league$season, league$week, run_date)
+}
 export_site_data(con, games$season[1], games$week[1], team)
 export_report_cards(con, games$season[1])
 export_predictions(con, games$season[1], games$week[1], run_date)
