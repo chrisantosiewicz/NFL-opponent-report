@@ -681,11 +681,15 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
       if (embedded) { $("week-wrap").hidden = true; await loadWeek(null); return; }
       state.index = await (await fetch("data/index.json", { cache: "no-cache" })).json();
       const weeks = state.index.weeks || [];
-      $("week").innerHTML = weeks.map(w => `<option value="${esc(w.file)}">${w.season} Week ${w.week}${w.focal_opponent ? ` · ${esc(w.focal_opponent)}` : ""}</option>`).join("");
+      $("week").innerHTML = weeks.map(w => `<option value="${esc(w.file)}">${w.season} Week ${w.week}${w.focal_opponent ? ` · ${esc(w.focal_opponent)}` : ` · ${esc(w.focal_team || "")} bye`}</option>`).join("");
       if (weeks.length < 2) $("week-wrap").hidden = true;
-      // ?week=<file> opens an older week (the archive links here); otherwise the newest.
+      // ?week=<file> opens an older week (the archive links here); otherwise the
+      // league's current week: the earliest one with games still to play today
+      // (US Eastern), which is this weekend's slate even when the Bears are on bye.
       const asked = new URLSearchParams(location.search).get("week");
-      const start = weeks.find(w => w.file === asked) || weeks[0];
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+      const open = weeks.filter(w => w.last_gameday && w.last_gameday >= today);
+      const start = weeks.find(w => w.file === asked) || open[open.length - 1] || weeks[0];
       $("week").value = start.file;
       await loadWeek(start.file);
     } catch (err) {

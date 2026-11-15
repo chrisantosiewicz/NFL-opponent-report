@@ -3,8 +3,8 @@
 --
 -- export_predictions() in R/pipeline.R loads the existing file into
 -- raw_prediction_locks, then fills {{season}}, {{week}}, {{run_date}},
--- {{updated}} and {{path}}. A game is locked the first time a run sees it in
--- the report week before its game day; a locked row is kept exactly as it was.
+-- {{updated}}, {{lock_before}} and {{path}}. A game is locked the first time a run sees
+-- it in a published week before kickoff; a locked row is kept exactly as it was.
 -- Grades (right / wrong, log loss for the model and the market) are worked out
 -- fresh each run from the final score; ties are not graded.
 
@@ -18,6 +18,12 @@ COPY (
         WHERE season = {{season}} AND week = {{week}}
           AND gameday >= DATE '{{run_date}}'
           AND game_id NOT IN (SELECT game_id FROM raw_prediction_locks)
+          -- Never lock a game that has kicked off ({{lock_before}} is now, US Eastern).
+          AND game_id NOT IN (
+              SELECT game_id FROM raw_schedules
+              WHERE gametime IS NOT NULL
+                AND strptime(CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5), '%Y-%m-%d %H:%M')
+                    <= strptime('{{lock_before}}', '%Y-%m-%d %H:%M'))
     ),
     graded AS (
         SELECT

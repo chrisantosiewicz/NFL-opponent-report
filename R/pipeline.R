@@ -256,6 +256,19 @@ find_next_week_matchups <- function(con, on_date = Sys.Date()) {
     ORDER BY g.gameday, g.game_id, g.is_home", params = list(as.Date(on_date)))
 }
 
+# The league's current week: the week of the next game on or after `on_date`,
+# whoever plays in it. The live page is for every team, so this week is
+# published even when the focal team is on bye (its report jumps ahead to the
+# focal team's next game). Empty off-season.
+find_league_week <- function(con, on_date = Sys.Date()) {
+  dbGetQuery(con, "
+    SELECT season, week
+    FROM stg_team_games
+    WHERE gameday >= ?
+    ORDER BY gameday
+    LIMIT 1", params = list(as.Date(on_date)))
+}
+
 # The week an update run refreshes: the newest week already published in
 # site/data (the Tuesday run's), as long as one of its games is still to be
 # played on or after `on_date`. Empty when there is nothing left to refresh.
@@ -321,9 +334,19 @@ export_predictions <- function(con, season, week, run_date, site_dir = "site") {
   }
   run_sql_template(con, "sql/export/site_predictions.sql", season = as.integer(season),
                    week = as.integer(week), run_date = format(as.Date(run_date)), path = path,
-                   updated = updated_stamp())
+                   lock_before = lock_before(run_date), updated = updated_stamp())
   message("exported ", path)
   invisible(path)
+}
+
+# A game is locked only if it has not kicked off yet. Kickoff times are US
+# Eastern (nflverse schedules), so "now" is too. A pretend --date runs as of
+# that day's midnight.
+lock_before <- function(run_date) {
+  if (as.Date(run_date) == Sys.Date()) {
+    return(format(Sys.time(), "%Y-%m-%d %H:%M", tz = "America/New_York"))
+  }
+  paste(format(as.Date(run_date)), "00:00")
 }
 
 # Writes site/data/report-cards-<season>.json: every graded matchup of the
