@@ -8,4 +8,4 @@ SELECT g.game_id, g.season, g.week, g.team, g.opponent, g.gameday
 FROM stg_team_games g
 WHERE g.awaiting_pbp
   AND g.is_home
-  AND g.gameday < current_date - 1;
+  AND CAST(g.gameday AS DATE) < current_date - INTERVAL 1 DAY;
