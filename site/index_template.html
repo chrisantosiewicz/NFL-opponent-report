@@ -55,26 +55,26 @@ a.tile { display: grid; justify-items: center; gap: 4px; padding: 12px 6px 10px;
   transition: border-color .15s, transform .15s, box-shadow .15s; }
 a.tile:hover { border-color: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent); transform: translateY(-1px); }
 a.tile.me { border: 2px solid var(--c); }
-.tile img, .mono { width: 56px; height: 56px; object-fit: contain; }
+.tile img, .mono { width: 64px; height: 64px; }
+.tile img { object-fit: contain; object-position: center; }
 .mono { display: grid; place-items: center; border-radius: 50%; background: var(--c); color: #fff; font: 700 17px var(--display); letter-spacing: 0.03em; }
 .tile .nm { font-weight: 600; font-size: 14px; line-height: 1.15; overflow-wrap: anywhere; }
 .tile .nx { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .tile .nx.bye { font-style: italic; }
 
-.more { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding-block: 16px 8px; }
+.about { margin: 16px auto 0; text-align: center; padding: 18px 24px; }
+.about.box p { max-width: 80ch; margin: 0 auto 8px; }
+.about .links { justify-content: center; }
 .box { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; }
 .box h2 { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 6px; }
 .box p { margin: 0 0 8px; color: var(--muted); }
 .links { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .links a { color: var(--accent); font-weight: 600; text-decoration: none; }
 .links a:hover { text-decoration: underline; }
-details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 8px; }
-details ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
-details li { margin: 2px 0; }
 footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--rule); padding-block: 14px 28px; margin-top: 16px; }
 [hidden] { display: none !important; }
 
-@media (max-width: 860px) { .confs, .more { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 860px) { .confs { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 420px) {
   .tiles { gap: 6px; }
   a.tile { padding: 10px 2px 8px; }
@@ -101,20 +101,10 @@ footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--rule)
 
   <section class="confs" id="teams" aria-label="Teams"><p class="week">Loading the teams…</p></section>
 
-  <section class="more">
-    <div class="box">
-      <h2>The Bears one-pager</h2>
-      <p id="bears-line">This week's print-ready report on the Bears' opponent.</p>
-      <div class="links"><a href="reports/{{LATEST}}.html">Open the one-pager</a><a href="reports/{{LATEST}}.pdf">PDF</a></div>
-      <details><summary>Every Bears one-pager this season</summary><ul>
-{{ARCHIVE}}
-      </ul></details>
-    </div>
-    <div class="box">
-      <h2>How it works</h2>
-      <p>Every Tuesday in the season, the latest nflverse play-by-play is modeled and tested, and every team gets a fresh scouting page. Injuries, lines and the forecast refresh through the weekend. Every number uses only games already played and shows its sample size.</p>
-      <div class="links"><a href="archive.html">How past calls held up</a></div>
-    </div>
+  <section class="about box">
+    <h2>How it works</h2>
+    <p>Every Tuesday in the season, the latest nflverse play-by-play is modeled and tested, and every team gets a fresh scouting page. Injuries, lines and the forecast refresh through the weekend. Every number uses only games already played and shows its sample size.</p>
+    <div class="links"><a href="archive.html">How past calls held up</a></div>
   </section>
 
   <footer>Updated {{UPDATED}} · Data: <a href="https://github.com/nflverse">nflverse</a> (openly licensed) ·
@@ -174,9 +164,6 @@ footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--rule)
       a.innerHTML = `${logo(t)}<span>Your team: ${esc(t.nick)}${g ? ` ${g.is_home ? "vs" : "at"} ${esc(nick(g.opponent))}` : " (bye)"}</span><span class="go">Scout →</span>`;
       a.hidden = false;
     }
-    // The Bears box names this week's matchup.
-    const slug = "{{LATEST}}".match(/^(\d{4})-week(\d{2})-([A-Z]+)$/);
-    if (slug && info.has(slug[3])) $("bears-line").textContent = `Week ${+slug[2]}: the ${info.get(slug[3]).nick}' offense, on one printable page.`;
   }
 
   $("teams").addEventListener("click", e => { const a = e.target.closest("a.tile"); if (a) remember(a.dataset.team); });
