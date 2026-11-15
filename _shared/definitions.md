@@ -52,6 +52,18 @@ Implemented in `sql/models/08_stg_injuries.sql`, `35_injury_report.sql` and `36_
 | Weather flags | Windy = 15+ mph sustained; cold = 32F or colder; wet = 50%+ precipitation chance. |
 | Weather context | Completed outdoor games since 2017 with the schedule's recorded kickoff temperature and wind: share that went under the closing total, for windy, cold, rain and snow games. Rain/snow = the gamebook's kickoff sky description names it (not "chance of rain"); 2017-2023 from `reference/gamebook_weather_2017_2023.csv`, later seasons from play-by-play. The page shows rain or snow history when the forecast is wet (snow at 34F or below). Context next to the total, not a model input. |
 
+## Attack plan and player trends (added Nov 15, 2026)
+
+Implemented in `sql/models/22_player_trends.sql`; the attack plan on `site/scout.html` also reads `24_defense_vs_position`, `25_team_yards` and `26_play_direction`.
+
+| Item | Definition |
+|------|-----------|
+| Attack plan | One offense next to the defense it plays this week: run side and lane, pass area, and position targeted, season to date, neutral downs (5-95% win probability) for direction. Sides are from the offense's view on both. |
+| Soft spot / tough | The defense ranks in the worst quarter of the league there (1-8 of 32 in EPA allowed) / the best quarter (25-32). |
+| Player picks | Per team: the QB with the most passing yards, the 2 backs with the most carries, the 4 WR/TE with the most targets, season to date. |
+| Player stats | From play-by-play: receiving = targets, catches, yards on catches; rushing = every carry with a rusher listed, scrambles included; passing = completions and yards on them. Per-game = over the games the player had a stat. Can differ slightly from official box scores. |
+| Prop trends | Averages and last 4 game logs next to what the opponent allows. No prop lines; not a pick. |
+
 ## Trades during the season
 
 nflverse's trade feed can lag by months (on Oct 30, 2026 its newest trade was from April), so the check has two other sources:

@@ -94,7 +94,7 @@ footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--rule)
 <main class="wrap">
   <section class="hero">
     <h1>Who's your favorite team?</h1>
-    <p>Pick your team to scout this week's opponent: how they call plays by down, distance and score, who's hurt, the line and the win chance.</p>
+    <p>Pick your team for this week's attack plan: where your offense can hit their defense, who to target, and player trends for props. Plus their tendencies, injuries, the line and the win chance.</p>
     <div class="week" id="week"></div>
     <a class="mine" id="mine" hidden></a>
   </section>
@@ -130,9 +130,9 @@ footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--rule)
     if (img.tagName === "IMG" && img.dataset.mono) img.outerHTML = img.dataset.mono;
   }, true);
 
-  // Where a tile goes: this week's opponent, scouted for the fan's team
-  // (like the Bears' report). A team on bye opens its own page.
-  const href = (t, game) => `scout.html?for=${encodeURIComponent(t.team)}#${encodeURIComponent(game ? game.opponent : t.team)}`;
+  // Where a tile goes: the team's attack plan (its offense vs this week's
+  // defense). A team on bye opens its own scouting page.
+  const href = (t, game) => `scout.html?for=${encodeURIComponent(t.team)}#${encodeURIComponent(t.team)}${game ? "/attack" : ""}`;
 
   function render(d) {
     const games = new Map((d.games || []).map(g => [g.team, g]));

@@ -43,6 +43,9 @@ SELECT
     receiver_id,
     air_yards,                     -- for deep targets in receiver_targets
     yards_gained,                  -- for production allowed by position
+    CAST(COALESCE(complete_pass, 0) AS INTEGER)  AS is_complete,     -- player trends
+    CAST(COALESCE(pass_touchdown, 0) AS INTEGER) AS is_pass_td,
+    CAST(COALESCE(rush_touchdown, 0) AS INTEGER) AS is_rush_td,
     run_location,                  -- left / middle / right (runs, incl. scrambles)
     run_gap,                       -- end / tackle / guard; NULL when middle
     pass_location,                 -- left / middle / right (aimed passes only)

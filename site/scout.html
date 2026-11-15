@@ -165,6 +165,29 @@ table.inj td.num { font-family: var(--mono); text-align: right; white-space: now
 .wx-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 table.h2h td b { font-weight: 500; font-family: var(--mono); }
 .disclaimer { font-size: 12px; color: var(--muted); }
+/* Attack plan. */
+.pill.soft { color: #1d7a3a; }
+.pill.tough { color: var(--muted); }
+:root[data-theme="dark"] .pill.soft { color: #5fd38a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.soft { color: #5fd38a; } }
+table.att td:first-child { width: 34%; }
+table.att td { white-space: normal; text-align: left; }
+table.att th { text-align: left; }
+.field { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.field .los { grid-column: 1 / -1; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.field .los.line { border-top: 3px solid var(--team, var(--ink)); padding-top: 4px; text-align: center; }
+.zone { border: 1px solid var(--rule); border-radius: 6px; padding: 8px; font-size: 12px; background: var(--paper); }
+.zone .zn { font-weight: 600; text-transform: capitalize; font-size: 13px; }
+.zone b { font-family: var(--mono); font-weight: 500; font-size: 15px; }
+.zone.soft { border-color: #1d7a3a; background: color-mix(in srgb, #1d7a3a 10%, var(--card)); }
+.zone.tough { opacity: 0.75; }
+h2.sec { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: 0.04em; text-transform: uppercase; margin: 18px 0 2px; }
+.prop header { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; margin-bottom: 6px; }
+table.props { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13px; }
+table.props th { font-size: 11px; color: var(--muted); text-align: left; font-weight: 600; padding: 2px 6px 4px 0; }
+table.props td { border-top: 1px solid var(--rule); padding: 4px 6px 4px 0; }
+table.props td b { font-family: var(--mono); font-weight: 500; }
+.prop .vs { margin: 8px 0 0; font-size: 12px; font-weight: 600; color: var(--accent); }
 
 @media (max-width: 760px) {
   .lines { grid-template-columns: minmax(0, 1fr); }
@@ -199,6 +222,7 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
 
 <footer class="wrap">
   <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. The win chance is a model estimate from an Elo rating (every team's strength, updated after each game, with home field and rest after a bye) and is shown next to the market's chance from the moneylines with the bookmaker's margin removed. Only win chances are shown: the model has not shown an edge against the spread or on totals. Trend records count each game against its closing line. Only games before this week are used.</p>
+  <p id="how-attack" hidden><strong>How to read this.</strong> The attack plan puts one offense next to the defense it faces this week. Run sides and pass areas are from the offense's view (left, middle, right of the offense) on both sides, using neutral downs (win probability 5-95%). A defense's rank of 1 means it allows the most EPA per play there; "soft spot" is the worst quarter of the league, "tough" the best quarter. Player trends come from the play-by-play, so they can differ slightly from official box scores, and per-game averages use the games the player played. They are trends, not prop picks: there are no prop lines here and nothing is betting advice. Only games before this week are used.</p>
   <p id="how-scout"><strong>How to read this.</strong> Every dot is one NFL team, ranked on the same plays. The big dot is the team you picked, the dark line is the league average. Pass rate counts sacks and scrambles as passes. Pass rate over expected compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse xpass model). EPA is expected points added per play; above 0 helps the offense. Early downs, 3rd down, red zone and all neutral use only plays with the offense's win probability between 5% and 95%; 2-minute and trailing by 8+ use every play. Numbers on fewer than 30 plays are greyed and marked * and never make "What stands out". Only games before this week are used.</p>
   <p id="foot-meta"></p>
 </footer>
@@ -358,34 +382,40 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
 
   // ---- Header: who is being scouted, for whom, and the two tabs ----------
   const dayOf = g => new Date(g.gameday + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  const vh = v => v === "scouting" ? "" : "/" + v;
   function sideHtml(t, role, scouted, badge = "") {
     const mark = t.logo ? `<img class="lg" src="${esc(t.logo)}" alt="" onerror="this.outerHTML='<span class=&quot;sw&quot;></span>'">` : `<span class="sw"></span>`;
     const inner = `${mark}<div><div class="role">${esc(role)}</div><div class="nm">${esc(t.nick)}</div>${badge}</div>`;
     // The other side of the matchup is a link: one tap scouts them instead.
     return scouted ? `<div class="side scouted" style="--c:${esc(t.color || "#888")}">${inner}</div>`
-      : `<a class="side" href="#${esc(t.team)}${state.view === "predictions" ? "/predictions" : ""}" style="--c:${esc(t.color || "#888")}" title="Scout the ${esc(t.nick)}">${inner}</a>`;
+      : `<a class="side" href="#${esc(t.team)}${vh(state.view)}" style="--c:${esc(t.color || "#888")}" title="Scout the ${esc(t.nick)}">${inner}</a>`;
   }
   function headerHtml(d, team, info, game, focal, isFocalOpp, onePager, backToOpp) {
     const focalNick = focal ? focal.nick : "Bears";
-    let bar = sideHtml(info, "Scouting", true, injuryBadge(d, team)), when = `Week ${d.week} · no game (bye)`;
+    const attack = state.view === "attack";
+    const mine = focal && team === focal.team && state.fan ? " · your team" : "";
+    const myRole = attack ? "Offense" + mine : "Scouting";
+    let bar = sideHtml(info, myRole, true, injuryBadge(d, team)), when = `Week ${d.week} · no game (bye)`;
     if (game) {
       const opp = d.teamInfo.get(game.opponent) || { nick: game.opponent, color: "#888" };
-      const oppRole = focal && game.opponent === focal.team ? (state.fan ? "Your team" : "Us") : "Opponent";
-      const me = sideHtml(info, "Scouting", true, injuryBadge(d, team)), them = sideHtml(opp, oppRole, false, injuryBadge(d, game.opponent));
+      const oppRole = attack ? "Defense" : focal && game.opponent === focal.team ? (state.fan ? "Your team" : "Us") : "Opponent";
+      const me = sideHtml(info, myRole, true, injuryBadge(d, team)), them = sideHtml(opp, oppRole, false, injuryBadge(d, game.opponent));
       bar = game.is_home ? `${them}<span class="at">at</span>${me}` : `${me}<span class="at">at</span>${them}`;
       when = `Week ${d.week} · ${dayOf(game)}`;
     }
-    const subject = state.view === "predictions"
+    const subject = attack
+      ? (game ? `Attack plan: the <b>${esc(info.nick)}</b>' offense vs the ${esc(d.teamInfo.get(game.opponent).nick)}' defense` : `Attack plan: <b>${esc(info.nick)}</b> (no game this week)`)
+      : state.view === "predictions"
       ? (game ? `Betting view: <b>${esc(info.nick)}</b> vs the ${esc(d.teamInfo.get(game.opponent).nick)}` : `Betting view: <b>${esc(info.nick)}</b>`)
       : isFocalOpp ? `Scouting the <b>${esc(info.nick)}</b>' offense for the ${esc(focalNick)}' defense`
       : `Scouting the <b>${esc(info.nick)}</b>' offense <span class="muted">(not this week's ${esc(focalNick)} opponent)</span>`;
-    const tab = (v, label) => `<a href="#${esc(team)}${v === "predictions" ? "/predictions" : ""}" data-view="${v}"${state.view === v ? ' aria-current="page"' : ""}>${label}</a>`;
+    const tab = (v, label) => `<a href="#${esc(team)}${vh(v)}" data-view="${v}"${state.view === v ? ' aria-current="page"' : ""}>${label}</a>`;
     return `<header class="top">
         <div class="matchbar">${bar}${onePager}</div>
         <div class="subject">${subject}</div>
         <div class="when">${esc(when)}${isFocalOpp ? ` · <span style="color:var(--accent)">${esc(focalNick)}’ next opponent</span>` : ""}</div>
         ${backToOpp ? `<div class="quick">${backToOpp}</div>` : ""}
-        <nav class="tabs" aria-label="View">${tab("scouting", "Scouting")}${tab("predictions", "Predictions")}</nav>
+        <nav class="tabs" aria-label="View">${tab("attack", "Attack plan")}${tab("scouting", "Scouting")}${tab("predictions", "Predictions")}</nav>
       </header>`;
   }
 
@@ -554,6 +584,129 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
       Log loss ${ll(g.map(x => x.model_log_loss)).toFixed(3)}${gm.length ? ` vs the market's ${ll(gm.map(x => x.market_log_loss)).toFixed(3)}` : ""} (lower is better). ${esc(preds.model_settings || "")}</p>`;
   }
 
+  // ---- Attack plan: one offense vs the defense it faces -------------------
+  // The "attacking their defense" half of the notes on the opponent (staff
+  // notes if written, else the generated draft): written for this offense.
+  async function attackNotes(d, opp, team) {
+    const slug = `${d.season}-week${String(d.week).padStart(2, "0")}-${opp}`;
+    let text = await loadNotes(slug);
+    if (!text) {
+      const draft = (d.drafts || []).filter(r => r.team === opp);
+      if (!draft.length) return null;
+      text = draft.map(r => (r.kind === "h" ? "## " : r.kind === "li" ? "- " : "") + r.text).join("\n");
+    }
+    const out = []; let on = false;
+    for (const ln of text.split(/\r?\n/)) {
+      const t = ln.trim();
+      if (/^## /.test(t)) on = /attacking|on offense|our offense/i.test(t);
+      if (on) out.push(ln);
+    }
+    return out.length ? out.join("\n") : null;
+  }
+  const softness = (rank, teams) => !rank || !teams ? "" : rank <= Math.ceil(teams / 4) ? `<span class="pill soft">Soft spot</span>`
+    : rank > teams - Math.ceil(teams / 4) ? `<span class="pill tough">Tough</span>` : "";
+  const sgn = (v, dp = 2) => v == null ? "–" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(dp);
+  const LANE = { left: "Left", middle: "Middle", right: "Right", inside: "Inside (guards, middle)", off_tackle: "Off tackle", outside: "Outside (around end)" };
+  function dirRows(d, team, opp, play_type, bucket_type) {
+    const all = (d.direction || []).filter(r => r.play_type === play_type && r.bucket_type === bucket_type);
+    const mine = new Map(all.filter(r => r.team === team && r.side === "offense").map(r => [r.bucket, r]));
+    const theirs = new Map(all.filter(r => r.team === opp && r.side === "defense").map(r => [r.bucket, r]));
+    return { mine, theirs };
+  }
+  function runTable(d, team, info, opp, oppInfo) {
+    const rows = [];
+    for (const bt of ["side", "width"]) {
+      const { mine, theirs } = dirRows(d, team, opp, "run", bt);
+      const order = bt === "side" ? ["left", "middle", "right"] : ["inside", "off_tackle", "outside"];
+      rows.push(`<tr class="grp"><td colspan="3">${bt === "side" ? "Run direction" : "Run lane"}</td></tr>`);
+      for (const b of order) {
+        const m = mine.get(b), t = theirs.get(b);
+        rows.push(`<tr><td>${LANE[b]}</td>
+          <td>${m ? `<b>${Math.round(100 * m.share)}%</b> of runs<small>league ${Math.round(100 * m.league_share)}% · ${m.ypp} yds/carry · ${m.plays} runs</small>` : "–"}</td>
+          <td>${t ? `<b>${t.ypp} yds/carry</b> ${softness(t.rank, t.teams)}<small>${sgn(t.epa)} EPA${t.rank ? ` · ${ord(t.rank)}-most allowed` : ""} · ${t.plays} runs</small>` : "–"}</td></tr>`);
+      }
+    }
+    return `<div class="box"><h2>Run game</h2>
+      <table class="h2h att"><thead><tr><th></th><th class="me">${esc(info.nick)} run</th><th>${esc(oppInfo.nick)} allow</th></tr></thead><tbody>${rows.join("")}</tbody></table>
+      <p class="muted" style="margin:8px 0 0">Sides are the offense's left and right. Designed runs on neutral downs, season to date.</p></div>`;
+  }
+  function passGrid(d, team, info, opp, oppInfo) {
+    const { mine, theirs } = dirRows(d, team, opp, "pass", "zone");
+    const cell = z => {
+      const m = mine.get(z), t = theirs.get(z);
+      const tone = t && t.rank && t.teams ? (t.rank <= Math.ceil(t.teams / 4) ? " soft" : t.rank > t.teams - Math.ceil(t.teams / 4) ? " tough" : "") : "";
+      return `<div class="zone${tone}"><div class="zn">${z.replace("_", " ")}</div>
+        <div><b>${t ? sgn(t.epa) : "–"}</b> <span class="muted">EPA allowed${t && t.rank ? ` · ${ord(t.rank)}` : ""}</span></div>
+        <div class="muted">${m ? `${esc(info.team)} throw ${Math.round(100 * m.share)}% here (lg ${Math.round(100 * m.league_share)}%)` : `${esc(info.team)}: no throws`}</div></div>`;
+    };
+    return `<div class="box"><h2>Passing game: where ${esc(oppInfo.nick)} give it up</h2>
+      <div class="field"><div class="los">Deep (15+ air yards)</div>
+        ${["deep_left", "deep_middle", "deep_right"].map(cell).join("")}
+        <div class="los">Short</div>
+        ${["short_left", "short_middle", "short_right"].map(cell).join("")}
+        <div class="los line">Line of scrimmage · ${esc(info.nick)} offense</div></div>
+      <p class="muted" style="margin:8px 0 0"><span class="pill soft">Soft</span> worst quarter of the league there, <span class="pill tough">Tough</span> best quarter. Aimed throws on neutral downs.</p></div>`;
+  }
+  function positionBox(d, oppInfo) {
+    const rows = ["WR", "TE", "RB"].map(pos => {
+      const r = (d.def_position || []).find(x => x.team === oppInfo.team && x.position === pos);
+      if (!r) return `<tr><td>${pos}s</td><td>–</td><td>–</td></tr>`;
+      return `<tr><td>${pos}s</td><td><b>${r.ypg}</b> yds/game<small>${ord(r.yards_rank)}-most of ${r.teams}</small></td>
+        <td><b>${sgn(r.epa)}</b> per target ${softness(r.rank, r.teams)}<small>${ord(r.rank)}-most · league ${sgn(r.league_epa)}</small></td></tr>`;
+    }).join("");
+    return `<div class="box"><h2>Who to target vs ${esc(oppInfo.nick)}</h2>
+      <table class="h2h att"><thead><tr><th></th><th>Yards allowed</th><th>EPA allowed</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  function injuryFor(d, team, name) {
+    const last = s => String(s || "").toLowerCase().replace(/[^a-z ]/g, "").trim();
+    const r = (d.injuries || []).find(x => x.team === team && last(x.player) === last(name));
+    return r && (r.flag === "out" || r.flag === "questionable") ? statusPill(r) : "";
+  }
+  function propCard(d, p, oppInfo) {
+    const per = (v, g) => g ? (v / g).toFixed(1) : "–";
+    const log = a => (a || []).map(v => Math.round(v)).join(", ");
+    const def = (d.def_position || []).find(x => x.team === oppInfo.team && x.position === (p.position === "TE" ? "TE" : p.position === "RB" ? "RB" : "WR"));
+    const dy = (d.yards || []).find(x => x.team === oppInfo.team && x.side === "defense");
+    let lines = [], vs = "";
+    if (p.role === "passer") {
+      lines.push(["Pass yds", per(p.pass_yards, p.games), per(p.last4_pass_yards, p.last4_games), log(p.recent_pass_yards)]);
+      lines.push(["Pass TD", per(p.pass_td, p.games), "", ""]);
+      if (p.carries >= 2 * p.games) lines.push(["Rush yds", per(p.rush_yards, p.games), per(p.last4_rush_yards, p.last4_games), log(p.recent_rush_yards)]);
+      if (dy) vs = `${esc(oppInfo.nick)} allow ${dy.pass_ypg} net pass yds/game (${ord(dy.pass_rank)}-most).`;
+    } else if (p.role === "rusher") {
+      lines.push(["Rush yds", per(p.rush_yards, p.games), per(p.last4_rush_yards, p.last4_games), log(p.recent_rush_yards)]);
+      lines.push(["Carries", per(p.carries, p.games), per(p.last4_carries, p.last4_games), `${Math.round(100 * p.carry_share)}% of team carries`]);
+      if (p.targets >= p.games) lines.push(["Rec yds", per(p.rec_yards, p.games), per(p.last4_rec_yards, p.last4_games), log(p.recent_rec_yards)]);
+      if (dy) vs = `${esc(oppInfo.nick)} allow ${dy.rush_ypg} rush yds/game (${ord(dy.rush_rank)}-most), ${dy.ypc} a carry (${ord(dy.ypc_rank)}).`;
+    } else {
+      lines.push(["Rec yds", per(p.rec_yards, p.games), per(p.last4_rec_yards, p.last4_games), log(p.recent_rec_yards)]);
+      lines.push(["Receptions", per(p.receptions, p.games), per(p.last4_receptions, p.last4_games), log(p.recent_receptions)]);
+      lines.push(["Targets", per(p.targets, p.games), per(p.last4_targets, p.last4_games), `${Math.round(100 * p.target_share)}% share`]);
+      if (def) vs = `${esc(oppInfo.nick)} allow ${def.ypg} yds/game to ${def.position}s (${ord(def.yards_rank)}-most).`;
+    }
+    const td = p.role === "passer" ? "" : p.rec_td + p.rush_td ? ` · ${p.rec_td + p.rush_td} TD in ${p.games} games` : "";
+    return `<article class="box prop">
+      <header><div><b>${esc(p.player)}</b> <span class="muted">${esc(p.position || "")}</span> ${injuryFor(d, p.team, p.player)}</div><span class="muted">${p.games} games${td}</span></header>
+      <table class="props"><thead><tr><th></th><th>Season</th><th>Last 4</th><th>Last 4 games, newest first</th></tr></thead>
+      <tbody>${lines.map(l => `<tr><td>${l[0]}</td><td><b>${l[1]}</b></td><td>${l[2] || ""}</td><td class="muted">${l[3]}</td></tr>`).join("")}</tbody></table>
+      ${vs ? `<p class="vs">${vs}</p>` : ""}</article>`;
+  }
+  function attackHtml(d, team, info, game, notes) {
+    if (!game) return `<div class="box" style="margin-top:12px"><h2>Bye week</h2><p class="muted">The ${esc(info.nick)} don't play this week. The Scouting tab still has their tendencies.</p></div>`;
+    const oppInfo = d.teamInfo.get(game.opponent);
+    if (!d.direction) return `<div class="box" style="margin-top:12px"><h2>Attack plan</h2><p class="muted">This week's data was published before the attack plan existed. It fills in with the next update.</p></div>`;
+    const players = (d.players || []).filter(p => p.team === team);
+    const order = { passer: 0, receiver: 1, rusher: 2 };
+    players.sort((a, b) => order[a.role] - order[b.role] || a.role_rank - b.role_rank);
+    return `<div class="asof" style="padding-top:10px">Season to date, games before Week ${d.week}. Ranks are among all 32 teams.</div>
+      ${notes ? `<div class="box notes" style="margin-top:12px"><h2>Where to attack the ${esc(oppInfo.nick)}</h2>${notesHtml(notes)}</div>` : ""}
+      <section class="lead">${runTable(d, team, info, game.opponent, oppInfo)}${positionBox(d, oppInfo)}</section>
+      ${passGrid(d, team, info, game.opponent, oppInfo)}
+      <h2 class="sec">Player trends for props</h2>
+      <p class="muted" style="margin:0 0 8px">Per-game averages next to what the ${esc(oppInfo.nick)} allow. Trends only: no prop lines here, and not betting advice.</p>
+      <section class="grid">${players.map(p => propCard(d, p, oppInfo)).join("") || `<p class="muted">No player data yet.</p>`}</section>`;
+  }
+
   // The print one-pager for the team on screen, if this week has one: the
   // Bears' opponent's is in the archive (reports/), every other team's in
   // reports/teams/ (current week only). Checked with HEAD, so the box only
@@ -593,7 +746,10 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
       .map(t => ({ ...t, ...get(team, t.situation, "season", t.metric) }));
     const sh = d.fallback ? [] : shifts(team);
     // Staff notes win; otherwise show the pipeline's generated draft for this offense.
-    let [notes, report] = await Promise.all([loadNotes(slug), findOnePager(d, team, slug)]), generated = false;
+    // On the attack plan the one-pager that fits is the opponent's, scouted for this team.
+    const rTeam = state.view === "attack" && game ? game.opponent : team;
+    const rSlug = `${d.season}-week${wk}-${rTeam}`;
+    let [notes, report] = await Promise.all([loadNotes(slug), findOnePager(d, rTeam, rSlug)]), generated = false;
     const draft = (d.drafts || []).filter(r => r.team === team);
     if (!notes && draft.length) {
       generated = true;
@@ -603,18 +759,28 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
     }
     if (state.data !== d || state.team !== team || state.span !== span) return;  // a newer render started
 
-    const forNick = game ? d.teamInfo.get(game.opponent).nick : null;
+    const rInfo = d.teamInfo.get(rTeam) || info;
+    const forNick = !game ? null : rTeam === team ? d.teamInfo.get(game.opponent).nick : info.nick;
     const onePager = report ? `<aside class="onepager" aria-label="One-pager">
-        <div><div class="q">Want a one-pager?</div><div class="s">The ${esc(info.nick)}' offense on one printable page${forNick ? `, scouted for the ${esc(forNick)}` : ""}.</div></div>
+        <div><div class="q">Want a one-pager?</div><div class="s">The ${esc(rInfo.nick)}' offense on one printable page${forNick ? `, scouted for the ${esc(forNick)}` : ""}.</div></div>
         <div class="go"><a href="${esc(report.html)}">Open</a>${report.pdf ? `<a href="${esc(report.pdf)}">PDF</a>` : ""}</div></aside>` : "";
-    const backToOpp = team !== F.opp && F.opp ? `<a href="#${esc(F.opp)}">Back to the ${esc(focal ? focal.nick : "Bears")}' opponent (${esc(F.opp)})</a>` : "";
+    const backToOpp = state.fan && d.teamInfo.has(state.fan)
+      ? (team !== F.team || state.view !== "attack" ? `<a href="#${esc(F.team)}/attack">Back to the ${esc(focal.nick)}' attack plan</a>` : "")
+      : team !== F.opp && F.opp ? `<a href="#${esc(F.opp)}">Back to the ${esc(focal ? focal.nick : "Bears")}' opponent (${esc(F.opp)})</a>` : "";
 
     const head = headerHtml(d, team, info, game, focal, isFocalOpp, onePager, backToOpp);
     const banner = d.fallback ? "" : span === "last4" ? `<div class="banner">Showing the last 4 games only. Samples are smaller, so more rows are greyed out.</div>` : "";
     document.title = `Scouting ${team} · ${focal ? focal.nick : "Bears"} Opponent Scout`;
     $("brand").innerHTML = `${esc(focal ? focal.nick : "Bears")} <b>Opponent</b> Scout`;
     $("foot-meta").innerHTML = `Updated ${esc(d.updated)}. Data: <a href="https://github.com/nflverse" target="_blank" rel="noopener">nflverse</a> play-by-play and schedules (nflfastR / nflreadr), openly licensed. Built by Chris Antosiewicz · <a href="https://github.com/chrisantosiewicz/nfl-opponent-report" target="_blank" rel="noopener">source</a>.`;
-    $("how-scout").hidden = state.view !== "scouting"; $("how-preds").hidden = state.view !== "predictions";
+    $("span-wrap").hidden = d.fallback || state.view === "attack";  // the attack plan is season to date
+    $("how-scout").hidden = state.view !== "scouting"; $("how-preds").hidden = state.view !== "predictions"; $("how-attack").hidden = state.view !== "attack";
+    if (state.view === "attack") {
+      const oppNotes = game ? await attackNotes(d, game.opponent, team) : null;
+      if (state.data !== d || state.team !== team || state.span !== span || state.view !== "attack") return;
+      $("app").innerHTML = head + attackHtml(d, team, info, game, oppNotes);
+      return;
+    }
     if (state.view === "predictions") {
       const preds = await loadPredictions(d.season);
       if (state.data !== d || state.team !== team || state.span !== span || state.view !== "predictions") return;
@@ -677,16 +843,19 @@ table.h2h td b { font-weight: 500; font-family: var(--mono); }
 
   function pickTeamFromHash() {
     const [h0, v] = decodeURIComponent(location.hash.slice(1)).split("/");
-    state.view = (v || "").toLowerCase() === "predictions" ? "predictions" : "scouting";
+    const want = (v || "").toLowerCase();
+    state.view = ["predictions", "attack"].includes(want) ? want : "scouting";
     const h = (h0 || "").toUpperCase();
     const d = state.data;
     if (h && d.teamInfo.has(h)) return h;
+    // A fan with no team in the URL starts on their own attack plan.
+    if (d.teamInfo.has(state.fan)) { if (!v) state.view = "attack"; return state.fan; }
     return focalOf(d).opp || (d.teamInfo.has(state.fan) && state.fan) || (d.games && d.games[0] && d.games[0].team) || d.teams[0].team;
   }
 
   function setTeam(t) {
     state.team = t; $("team").value = t;
-    const want = t + (state.view === "predictions" ? "/predictions" : "");
+    const want = t + vh(state.view);
     if (location.hash.slice(1) !== want) history.replaceState(null, "", "#" + want);
     render();
   }

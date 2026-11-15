@@ -17,6 +17,9 @@ PBP_COLUMNS <- c(
   # depth of the target, for the top-receiver model (deep = 20+ air yards),
   # and yards gained, for production allowed by position on defense
   "air_yards", "yards_gained",
+  # completions and touchdowns, for the player trends behind the prop angles
+  # on the attack view (22_player_trends.sql)
+  "complete_pass", "pass_touchdown", "rush_touchdown",
   # where the play went: run lane (left/middle/right x end/tackle/guard) and
   # pass area (left/middle/right x short/deep), for play_direction
   "run_location", "run_gap", "pass_location", "pass_length",
