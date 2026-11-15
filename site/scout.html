@@ -741,6 +741,20 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
       <section class="grid">${players.map(p => propCard(d, p, oppInfo)).join("")}</section>`;
   }
 
+  // A game with a final score whose play-by-play nflverse hasn't posted yet
+  // (usually Sunday or Monday night games, posted overnight): its numbers
+  // aren't in yet, for this team or, on the attack plan, its opponent.
+  function awaitingNote(d, team, game) {
+    const who = [team, ...(state.view === "attack" && game ? [game.opponent] : [])];
+    const rows = (d.awaiting || []).filter(r => who.includes(r.team));
+    if (!rows.length) return "";
+    const txt = rows.map(r => {
+      const t = d.teamInfo.get(r.team), o = d.teamInfo.get(r.opponent);
+      return `the ${esc(t ? t.nick : r.team)}' Week ${r.week} game ${r.is_home ? "vs" : "at"} the ${esc(o ? o.nick : r.opponent)} (${esc(dayOf(r))})`;
+    }).join(" and ");
+    return `<div class="banner" style="margin-top:10px"><b>Still waiting on Week ${rows[0].week} data.</b> Play-by-play for ${txt} isn't posted yet, so the numbers below don't include it. nflverse usually posts it overnight, and the page updates on the next run.</div>`;
+  }
+
   // The print one-pager for the team on screen, if this week has one: the
   // Bears' opponent's is in the archive (reports/), every other team's in
   // reports/teams/ (current week only). Checked with HEAD, so the box only
@@ -802,7 +816,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
       ? (team !== F.team || state.view !== "attack" ? `<a href="#${esc(F.team)}/attack">Back to the ${esc(focal.nick)}' attack plan</a>` : "")
       : team !== F.opp && F.opp ? `<a href="#${esc(F.opp)}">Back to the ${esc(focal ? focal.nick : "Bears")}' opponent (${esc(F.opp)})</a>` : "";
 
-    const head = headerHtml(d, team, info, game, focal, isFocalOpp, onePager, backToOpp);
+    const head = headerHtml(d, team, info, game, focal, isFocalOpp, onePager, backToOpp) + awaitingNote(d, team, game);
     const banner = d.fallback ? "" : span === "last4" ? `<div class="banner">Showing the last 4 games only. Samples are smaller, so more rows are greyed out.</div>` : "";
     document.title = `Scouting ${team} · ${focal ? focal.nick : "Bears"} Opponent Scout`;
     $("brand").innerHTML = `${esc(focal ? focal.nick : "Bears")} <b>Opponent</b> Scout`;

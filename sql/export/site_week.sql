@@ -28,6 +28,13 @@ COPY (
          FROM stg_team_games
          WHERE season = {{season}} AND week = {{week}})   AS games,
 
+        -- Games with a final score whose play-by-play isn't posted yet
+        -- (03_stg_team_games.sql): left out of the numbers; the page says so.
+        (SELECT list({team: team, opponent: opponent, week: week, season: season,
+                      is_home: is_home, gameday: CAST(gameday AS VARCHAR)})
+         FROM stg_team_games
+         WHERE awaiting_pbp AND season = {{season}} AND week < {{week}}) AS awaiting,
+
         -- Every team x situation x span x metric known before this week.
         (SELECT list({team: team, situation: situation, span: span, metric: metric,
                       value: round(value, 4), n: CAST(n AS INTEGER),
