@@ -17,6 +17,7 @@ The factory for this repo: stable across runs. Change a rule here and in the one
 | Window | Splits and ranks use the current season up to the report's week. Earlier seasons supply league baselines only. |
 | Last-season ranks | Full-season 2025 league rank shown next to each 2026 rank where applicable, with a caveat when the opponent changed play callers. |
 | Leakage | A report for week N uses only games before week N. |
+| Complete game | Final score in the schedule and play-by-play loaded. A game with a score but no play-by-play yet is "awaiting": left out of every number, and the live page says so on both teams. The run stops only if a game has waited more than a day (`test_completed_games_have_plays`). |
 | "3 things to know" | A metric in the league's top or bottom 10% with at least 30 plays. |
 | In-season move | A player who changed teams from the season's first game on (offseason trades excluded). Sources: nflverse trade feed, `config/trades_manual.csv`, and weekly rosters (53-man or reserve list one week, another team's the next). |
 | Regular (⚠) | Before the move, with the old team: 50%+ of dropbacks, 15%+ of targets, 30%+ of carries, or 60%+ of offensive or defensive snaps. |

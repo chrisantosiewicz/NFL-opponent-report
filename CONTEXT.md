@@ -4,7 +4,7 @@ Load, model, test, render, write notes, publish. One command runs the code steps
 
 | Step | Where | Output | Check |
 |---|---|---|---|
-| 1 Load | `R/pipeline.R` `load_raw_data()`, `config/*.csv` | `raw_*` tables in `data/nfl.duckdb` | freshness test in step 3 |
+| 1 Load | `R/pipeline.R` `load_raw_data()`, `config/*.csv` | `raw_*` tables in `data/nfl.duckdb` | freshness test in step 3 (a game may wait a day for its play-by-play) |
 | 2 Model | `sql/models/` (file-name order) | DuckDB tables | step 3 |
 | 3 Test | `sql/tests/` | nothing, or the run stops | every query returns zero rows |
 | 4 Export | `sql/export/` | `site/data/*.json` (week, index, report cards, locked predictions) | the live page loads the week |
