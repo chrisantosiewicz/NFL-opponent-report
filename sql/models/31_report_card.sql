@@ -108,25 +108,42 @@ tt_game AS (
     GROUP BY ALL
 ),
 
+-- The top target sat out the game (gameday inactive or on reserve), so the
+-- call says nothing about the scouting: graded "Didn't come up", not Miss.
+tt_out AS (
+    SELECT DISTINCT tt.season, tt.as_of_week AS week, tt.team
+    FROM top_target tt
+    JOIN raw_rosters_weekly ro
+      ON CAST(ro.season AS INTEGER) = tt.season AND CAST(ro.week AS INTEGER) = tt.as_of_week
+     AND ro.gsis_id = tt.receiver_id
+    WHERE ro.status IN ('INA', 'RES')
+),
+
 c_target AS (
     SELECT m.season, m.week, m.team, 4, 'defense', 'tendency', concat(tt.receiver_name, '''s target share'),
         concat(note_pct(tt.share), ' of their targets'),
-        concat(g.targets, ' of ', g.team_targets, ' (', note_pct(g.targets * 1.0 / g.team_targets), ')'),
-        CASE WHEN g.team_targets < 10 THEN 'Didn''t come up'
+        CASE WHEN g.did_not_play THEN concat(tt.receiver_name, ' didn''t play')
+             ELSE concat(g.targets, ' of ', g.team_targets, ' (', note_pct(g.targets * 1.0 / g.team_targets), ')') END,
+        CASE WHEN g.team_targets < 10 OR g.did_not_play THEN 'Didn''t come up'
              WHEN g.targets * 1.0 / g.team_targets >= tt.share - 0.08 THEN 'Hit' ELSE 'Miss' END
     FROM m
     JOIN top_target tt ON tt.season = m.season AND tt.as_of_week = m.week AND tt.team = m.team
-    JOIN tt_game g ON g.season = m.season AND g.week = m.week AND g.team = m.team
+    JOIN (SELECT g.*, o.team IS NOT NULL AS did_not_play FROM tt_game g
+          LEFT JOIN tt_out o USING (season, week, team)) g
+      ON g.season = m.season AND g.week = m.week AND g.team = m.team
     WHERE tt.share >= 0.22 AND tt.targets >= 20
     UNION ALL
     SELECT m.season, m.week, m.team, 5, 'defense', 'warning', concat('Take away ', tt.receiver_name),
         concat(note_epa(tt.epa_per_target), ' EPA per target; everyone else ', note_epa(tt.others_epa_per_target)),
-        concat(g.targets, ' targets, ', CAST(g.yards AS INTEGER), ' yards, ', note_epa(g.epa), ' EPA'),
-        CASE WHEN g.targets = 0 THEN 'Didn''t come up'   -- likely out, not covered
+        CASE WHEN g.did_not_play THEN concat(tt.receiver_name, ' didn''t play')
+             ELSE concat(g.targets, ' targets, ', CAST(g.yards AS INTEGER), ' yards, ', note_epa(g.epa), ' EPA') END,
+        CASE WHEN g.targets = 0 OR g.did_not_play THEN 'Didn''t come up'   -- likely out, not covered
              WHEN g.epa / g.targets <= 0.10 THEN 'Held' ELSE 'Called it' END
     FROM m
     JOIN top_target tt ON tt.season = m.season AND tt.as_of_week = m.week AND tt.team = m.team
-    JOIN tt_game g ON g.season = m.season AND g.week = m.week AND g.team = m.team
+    JOIN (SELECT g.*, o.team IS NOT NULL AS did_not_play FROM tt_game g
+          LEFT JOIN tt_out o USING (season, week, team)) g
+      ON g.season = m.season AND g.week = m.week AND g.team = m.team
     WHERE tt.share >= 0.22 AND tt.targets >= 20 AND tt.epa_per_target - tt.others_epa_per_target >= 0.30
 ),
 
