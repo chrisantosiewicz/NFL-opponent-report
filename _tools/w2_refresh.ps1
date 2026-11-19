@@ -1,6 +1,8 @@
 # Refresh W2's predictions on the live site (runs on Chris's laptop).
 #
-#   1. runs W2 for this NFL week in the betting repo (`betting predict week`),
+#   1. in the betting repo: refreshes the 2026 game data (-DataRefresh, if set),
+#      rebuilds W2's features (`betting predict build-features`), then runs W2
+#      for this NFL week (`betting predict week`). Predict only: never refits.
 #   2. copies the newest run into config/w2_predictions.csv (_tools/w2_to_csv.py),
 #   3. commits and pushes the CSV to main. That push starts an update run of the
 #      site (.github/workflows/weekly-report.yml), so the page shows the new
@@ -16,7 +18,12 @@ param(
     [int]$Season = 2026,
     # The Tuesday of week 1 (weeks turn over on Tuesdays). 2026: Thu Sep 10 opener.
     [datetime]$Week1Tuesday = "2026-09-08",
-    [int]$Week = 0   # 0 = work it out from today's date
+    [int]$Week = 0,  # 0 = work it out from today's date
+    # The betting repo's 2026 schedule + live play-by-play fetch, run from
+    # $BettingDir before build-features, e.g. "uv run betting <command> ...".
+    # 2026 only: never 2025 (the held-out season), no Odds API. Blank = skip
+    # (W2 then uses whatever game data the betting repo already has).
+    [string]$DataRefresh = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +39,17 @@ try {
 
     Push-Location $BettingDir
     try {
-        uv run betting predict week --season $Season --week $Week --data-dir (Join-Path $BettingDir "data")
+        $data = Join-Path $BettingDir "data"
+        if ($DataRefresh) {
+            Log "Data refresh: $DataRefresh"
+            Invoke-Expression $DataRefresh
+            if ($LASTEXITCODE -ne 0) { throw "data refresh exited $LASTEXITCODE" }
+        } else {
+            Log "No -DataRefresh set: using the betting repo's current game data."
+        }
+        uv run betting predict build-features --data-dir $data
+        if ($LASTEXITCODE -ne 0) { throw "betting predict build-features exited $LASTEXITCODE" }
+        uv run betting predict week --season $Season --week $Week --data-dir $data
         if ($LASTEXITCODE -ne 0) { throw "betting predict week exited $LASTEXITCODE" }
     } finally { Pop-Location }
 

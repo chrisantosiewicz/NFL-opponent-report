@@ -9,11 +9,17 @@
 # The laptop must be on (or wake) at those times; a missed run starts when it
 # comes back on. Remove with: Unregister-ScheduledTask -TaskName "NFL W2 refresh"
 #
-#   powershell -ExecutionPolicy Bypass -File _tools\install_w2_schedule.ps1
+#   powershell -ExecutionPolicy Bypass -File _tools\install_w2_schedule.ps1 [-DataRefresh "uv run betting ..."]
+#
+# -DataRefresh: the betting repo's 2026 schedule + play-by-play fetch command,
+# passed through to w2_refresh.ps1 (see there). Re-run this script to change it.
+
+param([string]$DataRefresh = "")
 
 $script = Join-Path $PSScriptRoot "w2_refresh.ps1"
+$extra = if ($DataRefresh) { " -DataRefresh `"$($DataRefresh -replace '"', '\"')`"" } else { "" }
 $action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$script`"" `
+    -Argument ("-NoProfile -ExecutionPolicy Bypass -File `"$script`"" + $extra) `
     -WorkingDirectory (Split-Path -Parent $PSScriptRoot)
 $triggers = @(
     New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday  -At "8:00AM"
