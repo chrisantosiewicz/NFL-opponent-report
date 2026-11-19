@@ -3,7 +3,9 @@
 # Team codes are nflverse's (LA = Rams). pfr_id is optional: without it the
 # player is matched by name to the from_team's snap counts that season.
 # A row is ignored once nflverse has the same player going to the same team.
-# Seeded Oct 30, 2026 from the NFL.com 2026 trade tracker (deadline Nov 10).
+# Seeded Oct 30, 2026 from the NFL.com 2026 trade tracker (deadline Nov 10);
+# Oct 30 - Nov 10 backfilled Nov 19, 2026 from the same tracker. The weekly run
+# lists team switches it found in rosters but not here (see config/CONTEXT.md).
 trade_date,from_team,to_team,player_name,position,pfr_id,notes,source_url
 2026-09-28,MIN,NYG,J.J. McCarthy,QB,,MIN gets 2027 5th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
 2026-09-30,PIT,DAL,Joey Porter Jr.,CB,,PIT gets 2027 6th (conditional?) and 2028 2nd; NFL.com dates it Oct 1,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
@@ -12,3 +14,14 @@ trade_date,from_team,to_team,player_name,position,pfr_id,notes,source_url
 2026-10-27,IND,SF,DeForest Buckner,DT,,IND gets 2027 4th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
 2026-10-27,IND,SEA,Quenton Nelson,G,,IND gets 2027 3rd and 2028 5th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
 2026-10-29,TEN,CHI,Jeffery Simmons,DT,,CHI also gets 2028 5th; TEN gets 2027 1st and 4th and 2028 1st (date not cross-checked),https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-06,ARI,BAL,Jacoby Brissett,QB,,BAL also gets 2027 5th; ARI gets 2027 4th and 2028 7th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-09,ATL,JAX,Jessie Bates,S,,ATL gets 2027 2nd and 2028 5th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-09,NYJ,DET,Andre Cisco,S,,NYJ gets 2028 6th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-09,NO,JAX,Davon Godchaux,DT,,NO gets 2028 conditional 6th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-09,PHI,JAX,Jordan Davis,DT,,PHI gets 2027 1st and 2029 2nd,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-10,TEN,BUF,Amani Hooker,S,,BUF also gets 2027 5th; TEN gets 2027 2nd,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-10,IND,SF,Keenan Allen,WR,,IND gets 2027 6th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-10,LV,MIN,Kirk Cousins,QB,,LV gets 2027 3rd,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-10,IND,KC,Josh Downs,WR,,KC also gets 2027 7th; IND gets 2027 4th and 5th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-10,ATL,BAL,Ryan Neuzil,C,,swap for Andrew Vorhees; ATL also gets 2028 6th,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season
+2026-11-10,BAL,ATL,Andrew Vorhees,G,,swap for Ryan Neuzil,https://www.nfl.com/news/nfl-trade-deadline-track-every-move-since-start-of-2026-regular-season

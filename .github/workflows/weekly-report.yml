@@ -39,6 +39,7 @@ permissions:
   contents: write   # commit the new report into the archive
   pages: write
   id-token: write
+  issues: write     # the "Trades to confirm" issue from the league roster check
 
 concurrency:
   group: weekly-report
@@ -79,6 +80,28 @@ jobs:
           echo "RUN_MODE=$mode" >> "$GITHUB_ENV"
           echo "Run mode: $mode"
           if [ "$mode" = update ]; then Rscript run_pipeline.R --update; else Rscript run_pipeline.R; fi
+
+      # The league roster check (check_league_moves() in R/pipeline.R) lists
+      # team switches in the weekly rosters that no trade list has. Keep one
+      # open issue with the latest list, so it reaches Chris by email instead
+      # of sitting in the run log; close it when the list is empty.
+      - name: Trades to confirm issue
+        if: always() && github.ref == 'refs/heads/main' && env.FOCAL_TEAM == 'CHI'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          f=data/roster-moves-to-confirm.md
+          [ -f "$f" ] || { echo "No roster check output"; exit 0; }
+          title="Trades to confirm"
+          num=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+                --jq ".[] | select(.title == \"$title\") | .number" | head -1)
+          if [ -s "$f" ]; then
+            if [ -n "$num" ]; then gh issue edit "$num" --body-file "$f"
+            else gh issue create --title "$title" --body-file "$f" --assignee "${{ github.repository_owner }}"; fi
+          elif [ -n "$num" ]; then
+            gh issue close "$num" --comment "Every team switch in the weekly rosters is on a trade list now."
+          fi
 
       # Only the Bears' scheduled or manual runs on main touch the archive and
       # the live site. A run from another branch or for another team still

@@ -12,4 +12,4 @@ One job: hold what nflverse doesn't publish (yet). Each CSV explains its columns
 How and why trades are tracked: [definitions](../_shared/definitions.md), "Trades during the season".
 
 ## Check
-`sql/tests/test_manual_trades_parse.sql` and `test_trades_teams_valid.sql` pass on the next run. A "Seen in weekly rosters but not in any trade list" warning means a row is missing here.
+`sql/tests/test_manual_trades_parse.sql` and `test_trades_teams_valid.sql` pass on the next run. Every run also checks all 32 teams' weekly rosters for team switches that no trade list has, and keeps the open "Trades to confirm" GitHub issue up to date with them (`check_league_moves()`). Each one there is either a trade to add here or a waiver claim to leave alone; it drops off once its row is here.

@@ -77,6 +77,6 @@ Implemented in `sql/models/22_player_trends.sql`, `09_stg_charting.sql` and `37_
 nflverse's trade feed can lag by months (on Oct 30, 2026 its newest trade was from April), so the check has two other sources:
 
 1. **`config/trades_manual.csv`**: add a row per player when a trade happens (date, from, to, name, position; PFR id optional). Picks go in `notes`. Once nflverse publishes the trade, the manual row is ignored automatically.
-2. **Weekly rosters**: a player who shows up on a new team's roster is caught even if nobody typed the trade in. The run log then says "Seen in weekly rosters but not in any trade list", which is your cue to add it to the CSV (or ignore it if it was a waiver claim).
+2. **Weekly rosters**: a player who shows up on a new team's roster is caught even if nobody typed the trade in. Every run (Tuesday report and the Thu/Sat/Sun/Mon updates) lists these for all 32 teams, first seen in the last 14 days, in the "Trades to confirm" GitHub issue and on the run's summary page. That is your cue to add it to the CSV (or ignore it if it was a waiver claim). Rosters catch a move only once the new team's weekly roster has him, and skip a player marked cut by the old team, so a deadline trade is best typed in from the NFL.com tracker the day it happens.
 
 Every run prints each move involving the Bears or the opponent, and a GitHub Actions warning when one of the opponent's regulars moved. The report shows the same moves in a "Roster changes" box above "3 things to know" and says how many of the opponent's games came before the move.

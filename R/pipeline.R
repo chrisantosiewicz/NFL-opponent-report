@@ -482,6 +482,49 @@ check_trades <- function(con, game) {
   invisible(moves)
 }
 
+# The league-wide roster check, on every run (Tuesday's report and the
+# Thu/Sat/Sun/Mon updates). check_trades() only looks at the two teams in the
+# report's game; this lists every team switch in the weekly rosters, for all
+# 32 teams, that no trade list explains yet, first seen in the last `days`
+# days. Each one is either a trade to add to config/trades_manual.csv or a
+# waiver claim/signing to leave alone. A move drops off this list once its
+# trade is in the CSV (stg_trades keeps the listed trade instead).
+# Writes the list to `out` (Markdown) for the workflow's "Trades to confirm"
+# issue, and to the run's summary page on GitHub Actions.
+check_league_moves <- function(con, run_date, days = 14, out = "data/roster-moves-to-confirm.md") {
+  moves <- dbGetQuery(con, "
+    SELECT trade_date, from_team, to_team, player_name, position
+    FROM stg_trades
+    WHERE source = 'roster'
+      AND trade_date >= ?
+    ORDER BY trade_date, to_team, player_name",
+    params = list(as.Date(run_date) - days))
+  dir.create(dirname(out), showWarnings = FALSE, recursive = TRUE)
+  if (nrow(moves) == 0) {
+    message("League roster check: every team switch in the last ", days, " days is on a trade list")
+    writeLines(character(), out)
+    return(invisible(moves))
+  }
+  rows <- sprintf("| %s | %s | %s | %s | %s |", format(as.Date(moves$trade_date)),
+                  ifelse(is.na(moves$position), "", moves$position), moves$player_name,
+                  moves$from_team, moves$to_team)
+  body <- c(
+    sprintf("Run of %s: %d team switch%s in the weekly rosters (last %d days) that no trade list has.",
+            format(as.Date(run_date)), nrow(moves), if (nrow(moves) == 1) "" else "es", days),
+    "If one was a trade, add a row to `config/trades_manual.csv` (date from the NFL.com tracker).",
+    "Waiver claims and signings need nothing: they already show in the Roster changes box as roster moves.",
+    "Dates are the day after the old team's last game with him, not the trade date.",
+    "", "| Seen from | Pos | Player | From | To |", "|---|---|---|---|---|", rows)
+  writeLines(body, out)
+  summary <- Sys.getenv("GITHUB_STEP_SUMMARY")
+  if (nzchar(summary)) cat(c("## Trades to confirm", "", body, ""), file = summary, sep = "\n", append = TRUE)
+  warn_run(sprintf("Seen in weekly rosters but not in any trade list (all teams, last %d days): %s. If any was a trade, add it to config/trades_manual.csv",
+                   days, paste(sprintf("%s (%s -> %s)", moves$player_name, moves$from_team, moves$to_team),
+                               collapse = ", ")),
+           title = "League roster check")
+  invisible(moves)
+}
+
 warn_run <- function(text, title = "Trade check") {
   message("WARNING: ", text)
   if (identical(Sys.getenv("GITHUB_ACTIONS"), "true")) cat("::warning title=", title, "::", text, "\n", sep = "")

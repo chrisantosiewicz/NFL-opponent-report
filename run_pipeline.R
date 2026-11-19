@@ -38,6 +38,7 @@ if (!isTRUE(arg("skip-load", FALSE)) || !dbExistsTable(con, "raw_weather_hourly"
 }
 build_models(con)
 run_data_tests(con)
+check_league_moves(con, run_date)
 
 # Update runs (Thursday, Saturday, Sunday and Monday mornings; see
 # .github/workflows/weekly-report.yml) refresh the live page's data for the
