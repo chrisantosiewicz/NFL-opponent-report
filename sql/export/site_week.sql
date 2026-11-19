@@ -57,18 +57,24 @@ COPY (
          FROM draft_notes
          WHERE season = {{season}} AND week = {{week}})   AS drafts,
 
-        -- This week's betting lines and the model's win % (Predictions tab).
+        -- This week's betting lines and the models' win % (Predictions tab).
         -- Lines from nflverse schedules; home_line is from the home side,
-        -- favorite negative. The model is Elo (33_game_predictions.sql).
-        (SELECT list({game_id: game_id, home_team: home_team, away_team: away_team,
-                      home_line: home_line, total_line: total_line,
-                      home_moneyline: home_moneyline, away_moneyline: away_moneyline,
-                      market_home_win: round(market_home_win, 4),
-                      model_home_win: round(model_home_win, 4),
-                      model_version: model_version}
-                     ORDER BY gameday, game_id)
-         FROM game_predictions
-         WHERE season = {{season}} AND week = {{week}})   AS lines,
+        -- favorite negative. Elo is 33_game_predictions.sql; W2 (Chris's
+        -- betting repo, 38_w2_predictions.sql) is null for a game it hasn't run.
+        (SELECT list({game_id: p.game_id, home_team: p.home_team, away_team: p.away_team,
+                      home_line: p.home_line, total_line: p.total_line,
+                      home_moneyline: p.home_moneyline, away_moneyline: p.away_moneyline,
+                      market_home_win: round(p.market_home_win, 4),
+                      model_home_win: round(p.model_home_win, 4),
+                      model_version: p.model_version,
+                      w2_home_win: round(w.w2_home_win, 4),
+                      w2_home_line: round(w.w2_home_line, 1),
+                      w2_total: round(w.w2_total, 1),
+                      w2_run_at: w.w2_run_at}
+                     ORDER BY p.gameday, p.game_id)
+         FROM game_predictions p
+         LEFT JOIN w2_predictions w USING (game_id)
+         WHERE p.season = {{season}} AND p.week = {{week}})   AS lines,
 
         -- Records against past closing lines, every team, both windows
         -- (34_betting_trends.sql). Games before this week only.

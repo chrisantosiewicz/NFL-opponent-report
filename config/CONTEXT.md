@@ -6,6 +6,7 @@ One job: hold what nflverse doesn't publish (yet). Each CSV explains its columns
 |---|---|---|
 | `trades_manual.csv` | a trade happens in season (one row per player) | `load_manual_trades()` -> `sql/models/06_stg_trades.sql` |
 | `stadiums.csv` | the schedule names a stadium not in it (a "No stadium location" warning) | `load_stadiums()`, `fetch_weather()` -> `sql/models/36_game_weather.sql` |
+| `w2_predictions.csv` | after each W2 predict run on the laptop: `python3 -I _tools/w2_to_csv.py <w2 json>`, then commit (not typed by hand) | `load_w2_predictions()` -> `sql/models/38_w2_predictions.sql` |
 | `coaching_changes_manual.csv` | offseason HC/OC/DC changes, before Week 1 | `sql/models/27_week1_carryover.sql` |
 
 How and why trades are tracked: [definitions](../_shared/definitions.md), "Trades during the season".
