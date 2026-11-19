@@ -5,8 +5,8 @@
 -- raw_prediction_locks, then fills {{season}}, {{week}}, {{run_date}},
 -- {{updated}}, {{lock_before}} and {{path}}. A game is locked the first time a run sees
 -- it in a published week before kickoff; a locked row is kept exactly as it was.
--- W2 (38_w2_predictions.sql) is locked the same way, on its own clock, in the
--- w2_* fields. Grades (right / wrong, log loss for each model and the market) are worked out
+-- W2 (38_w2_predictions.sql) is in the w2_* fields: its last run before
+-- kickoff is the one kept and graded. Grades (right / wrong, log loss for each model and the market) are worked out
 -- fresh each run from the final score; ties are not graded.
 
 COPY (
@@ -26,21 +26,34 @@ COPY (
                 AND strptime(CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5), '%Y-%m-%d %H:%M')
                     <= strptime('{{lock_before}}', '%Y-%m-%d %H:%M'))
     ),
-    -- W2's calls, locked the same way on their own clock (raw_w2_locks holds
-    -- the ones already in the file).
-    w2_locks AS (
-        SELECT * FROM raw_w2_locks
-        UNION ALL
-        SELECT game_id, w2_home_win, w2_home_margin, w2_total, w2_fit_run_id, '{{updated}}' AS w2_locked_at
-        FROM w2_predictions
-        WHERE season = {{season}} AND week = {{week}}
-          AND gameday >= DATE '{{run_date}}'
-          AND game_id NOT IN (SELECT game_id FROM raw_w2_locks)
-          AND game_id NOT IN (
+    -- W2's calls: its LAST run before kickoff is the one graded. Until a game
+    -- kicks off, each run takes W2's newest number for it (the laptop refreshes
+    -- config/w2_predictions.csv through the week); once it kicks off, the
+    -- number in the file is final and never rewritten. raw_w2_locks holds the
+    -- ones already in the file. w2_locked_at changes only when the number does.
+    w2_open AS (
+        SELECT w.*
+        FROM w2_predictions w
+        WHERE w.season = {{season}} AND w.week = {{week}}
+          AND w.gameday >= DATE '{{run_date}}'
+          AND w.game_id NOT IN (
               SELECT game_id FROM raw_schedules
               WHERE gametime IS NOT NULL
                 AND strptime(CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5), '%Y-%m-%d %H:%M')
                     <= strptime('{{lock_before}}', '%Y-%m-%d %H:%M'))
+    ),
+    w2_locks AS (
+        SELECT * FROM raw_w2_locks
+        WHERE game_id NOT IN (SELECT game_id FROM w2_open)
+        UNION ALL
+        SELECT o.game_id, o.w2_home_win, o.w2_home_margin, o.w2_total, o.w2_fit_run_id,
+               CASE WHEN r.game_id IS NOT NULL
+                         AND round(r.w2_home_win, 4) = round(o.w2_home_win, 4)
+                         AND round(r.w2_home_margin, 2) = round(o.w2_home_margin, 2)
+                         AND round(r.w2_total, 2) = round(o.w2_total, 2)
+                    THEN r.w2_locked_at ELSE '{{updated}}' END AS w2_locked_at
+        FROM w2_open o
+        LEFT JOIN raw_w2_locks r USING (game_id)
     ),
     graded AS (
         SELECT
