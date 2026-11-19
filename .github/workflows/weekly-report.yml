@@ -120,8 +120,11 @@ jobs:
             else
               git commit -m "Report: $(ls -t site/reports/*.html | head -1 | xargs basename)"
             fi
-            git pull --rebase origin main
-            git push origin HEAD:main
+            # The laptop's W2 push can land mid-run: rebase and retry.
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push origin HEAD:main && break
+              [ "$i" = 3 ] && exit 1; sleep 10
+            done
           fi
 
       - uses: actions/upload-pages-artifact@v3
