@@ -9,6 +9,12 @@
 --   sit1 / sit2       the two situations where his share is highest, among
 --                     those with 10+ team targets and 5+ of his. Shares there
 --                     are compared with his overall share in the notes.
+--
+-- A receiver who is known to be out for the week is skipped, and the next
+-- most-targeted receiver is the pick: on reserve (IR, PUP, suspended: weekly
+-- roster status RES) or ruled Out on that week's injury report. Gameday
+-- inactives (INA) are not known in advance, so they are not skipped here; the
+-- report card grades those calls "Didn't come up".
 
 CREATE OR REPLACE TABLE top_target AS
 WITH season_all AS (
@@ -17,6 +23,14 @@ WITH season_all AS (
     JOIN (SELECT season, as_of_week, team, COUNT(*) AS games
           FROM game_windows GROUP BY ALL) g USING (season, as_of_week, team)
     WHERE r.span = 'season' AND r.situation = 'all'
+      AND NOT EXISTS (SELECT 1 FROM raw_rosters_weekly ro
+                      LEFT JOIN team_alias a ON a.alias = ro.team
+                      WHERE CAST(ro.season AS INTEGER) = r.season AND CAST(ro.week AS INTEGER) = r.as_of_week
+                        AND COALESCE(a.team, ro.team) = r.team AND ro.gsis_id = r.receiver_id
+                        AND ro.status = 'RES')
+      AND NOT EXISTS (SELECT 1 FROM stg_injuries i
+                      WHERE i.season = r.season AND i.week = r.as_of_week AND i.team = r.team
+                        AND i.gsis_id = r.receiver_id AND i.report_status = 'Out')
 ),
 
 ranked AS (

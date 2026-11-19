@@ -59,14 +59,18 @@ ds AS (
 ),
 
 -- 1. Early-down identity -------------------------------------------------------
+-- Graded only on early downs within one score (7 points). A team up or down
+-- big runs or throws because of the score, not its identity: in week 10 of
+-- 2026, 4 of the 12 misses on all neutral downs were blowouts.
+
 c_identity AS (
     SELECT m.season, m.week, m.team, 1 AS call_no, 'defense' AS side, 'tendency' AS kind, 'Early-down identity' AS call,
         CASE WHEN t.league_rank >= t.league_teams - 7 THEN concat('Run-first: ', note_ord(t.league_rank), ' in early-down pass rate over expected')
              WHEN t.league_rank <= 8 THEN concat('Pass-first: ', note_ord(t.league_rank), ' in early-down pass rate over expected')
              ELSE concat('Balanced: ', note_value('proe', t.value), ' over expected (', note_ord(t.league_rank), ')') END AS said,
-        CASE WHEN g.n < 10 THEN concat('Only ', g.n, ' neutral early-down plays')
+        CASE WHEN g.n < 10 THEN concat('Only ', g.n, ' early downs within one score')
              ELSE concat(CASE WHEN g.proe < 0 THEN 'Ran ' ELSE 'Passed ' END, CAST(abs(round(100 * g.proe)) AS INTEGER),
-                         ' pts more than expected on ', g.n, ' neutral early downs') END AS happened,
+                         ' pts more than expected on ', g.n, ' early downs within one score') END AS happened,
         CASE WHEN g.n < 10 THEN 'Didn''t come up'
              WHEN t.league_rank >= t.league_teams - 7 THEN CASE WHEN g.proe < 0 THEN 'Hit' ELSE 'Miss' END
              WHEN t.league_rank <= 8 THEN CASE WHEN g.proe > 0 THEN 'Hit' ELSE 'Miss' END
@@ -74,7 +78,8 @@ c_identity AS (
     FROM m
     JOIN tr t ON t.season = m.season AND t.week = m.week AND t.team = m.team AND t.situation = 'early_down' AND t.metric = 'proe'
     JOIN (SELECT season, week, team, COUNT(*) AS n, AVG(is_pass - xpass) AS proe
-          FROM theirs WHERE is_early_down AND is_neutral_wp AND xpass IS NOT NULL GROUP BY ALL) g
+          FROM theirs WHERE is_early_down AND is_neutral_wp AND xpass IS NOT NULL
+            AND abs(score_differential) <= 7 GROUP BY ALL) g
       ON g.season = m.season AND g.week = m.week AND g.team = m.team
 ),
 
@@ -108,25 +113,42 @@ tt_game AS (
     GROUP BY ALL
 ),
 
+-- The top target sat out the game (gameday inactive or on reserve), so the
+-- call says nothing about the scouting: graded "Didn't come up", not Miss.
+tt_out AS (
+    SELECT DISTINCT tt.season, tt.as_of_week AS week, tt.team
+    FROM top_target tt
+    JOIN raw_rosters_weekly ro
+      ON CAST(ro.season AS INTEGER) = tt.season AND CAST(ro.week AS INTEGER) = tt.as_of_week
+     AND ro.gsis_id = tt.receiver_id
+    WHERE ro.status IN ('INA', 'RES')
+),
+
 c_target AS (
     SELECT m.season, m.week, m.team, 4, 'defense', 'tendency', concat(tt.receiver_name, '''s target share'),
         concat(note_pct(tt.share), ' of their targets'),
-        concat(g.targets, ' of ', g.team_targets, ' (', note_pct(g.targets * 1.0 / g.team_targets), ')'),
-        CASE WHEN g.team_targets < 10 THEN 'Didn''t come up'
+        CASE WHEN g.did_not_play THEN concat(tt.receiver_name, ' didn''t play')
+             ELSE concat(g.targets, ' of ', g.team_targets, ' (', note_pct(g.targets * 1.0 / g.team_targets), ')') END,
+        CASE WHEN g.team_targets < 10 OR g.did_not_play THEN 'Didn''t come up'
              WHEN g.targets * 1.0 / g.team_targets >= tt.share - 0.08 THEN 'Hit' ELSE 'Miss' END
     FROM m
     JOIN top_target tt ON tt.season = m.season AND tt.as_of_week = m.week AND tt.team = m.team
-    JOIN tt_game g ON g.season = m.season AND g.week = m.week AND g.team = m.team
+    JOIN (SELECT g.*, o.team IS NOT NULL AS did_not_play FROM tt_game g
+          LEFT JOIN tt_out o USING (season, week, team)) g
+      ON g.season = m.season AND g.week = m.week AND g.team = m.team
     WHERE tt.share >= 0.22 AND tt.targets >= 20
     UNION ALL
     SELECT m.season, m.week, m.team, 5, 'defense', 'warning', concat('Take away ', tt.receiver_name),
         concat(note_epa(tt.epa_per_target), ' EPA per target; everyone else ', note_epa(tt.others_epa_per_target)),
-        concat(g.targets, ' targets, ', CAST(g.yards AS INTEGER), ' yards, ', note_epa(g.epa), ' EPA'),
-        CASE WHEN g.targets = 0 THEN 'Didn''t come up'   -- likely out, not covered
+        CASE WHEN g.did_not_play THEN concat(tt.receiver_name, ' didn''t play')
+             ELSE concat(g.targets, ' targets, ', CAST(g.yards AS INTEGER), ' yards, ', note_epa(g.epa), ' EPA') END,
+        CASE WHEN g.targets = 0 OR g.did_not_play THEN 'Didn''t come up'   -- likely out, not covered
              WHEN g.epa / g.targets <= 0.10 THEN 'Held' ELSE 'Called it' END
     FROM m
     JOIN top_target tt ON tt.season = m.season AND tt.as_of_week = m.week AND tt.team = m.team
-    JOIN tt_game g ON g.season = m.season AND g.week = m.week AND g.team = m.team
+    JOIN (SELECT g.*, o.team IS NOT NULL AS did_not_play FROM tt_game g
+          LEFT JOIN tt_out o USING (season, week, team)) g
+      ON g.season = m.season AND g.week = m.week AND g.team = m.team
     WHERE tt.share >= 0.22 AND tt.targets >= 20 AND tt.epa_per_target - tt.others_epa_per_target >= 0.30
 ),
 
@@ -302,6 +324,29 @@ c_redzone AS (
       ON g.season = m.season AND g.week = m.week AND g.team = m.team
 ),
 
+-- A starting quarterback the calls weren't built on: the game's main passer
+-- (most dropbacks) threw under a third of the team's dropbacks in the games
+-- before the week. The pass/run identity and run/dropback efficiency calls
+-- describe another offense, so they are graded "Didn't come up" (week 10 of
+-- 2026: Cousins for Minnesota after a trade, Brissett for Baltimore, DeVito for
+-- New England). Week 1 is not checked.
+qb_dropbacks AS (
+    SELECT season, week, team, passer_id, COUNT(*) AS n
+    FROM stg_plays WHERE is_pass = 1 AND passer_id IS NOT NULL GROUP BY ALL
+),
+
+qb_change AS (
+    SELECT g.season, g.week, g.team, COALESCE(pl.display_name, g.qb) AS new_qb
+    FROM (SELECT season, week, team, arg_max(passer_id, n) AS qb FROM qb_dropbacks GROUP BY ALL) g
+    JOIN m USING (season, week, team)
+    JOIN qb_dropbacks b ON b.season = g.season AND b.team = g.team AND b.week < g.week
+    LEFT JOIN (SELECT gsis_id, any_value(display_name) AS display_name FROM raw_players GROUP BY ALL) pl
+      ON pl.gsis_id = g.qb
+    WHERE g.week > 1
+    GROUP BY ALL
+    HAVING COALESCE(SUM(b.n) FILTER (WHERE b.passer_id = g.qb), 0) < SUM(b.n) / 3.0
+),
+
 calls AS (
     SELECT * FROM c_identity UNION ALL SELECT * FROM c_works UNION ALL SELECT * FROM c_target
     UNION ALL SELECT * FROM c_lean UNION ALL SELECT * FROM c_third UNION ALL SELECT * FROM c_hot
@@ -311,7 +356,11 @@ calls AS (
 
 SELECT m.season, m.week, m.team, m.opponent, m.gameday, m.is_home, m.team_score, m.opponent_score,
        CASE WHEN m.week = 1 THEN 'last_season' ELSE 'in_season' END AS basis,   -- Week 1 is scouted from last season
-       c.call_no, c.side, c.kind, c.call, c.said, c.happened, c.verdict,
+       c.call_no, c.side, c.kind, c.call, c.said,
+       CASE WHEN q.new_qb IS NOT NULL AND c.call_no IN (1, 2, 3)
+            THEN concat('New QB (', q.new_qb, '): ', c.happened) ELSE c.happened END AS happened,
+       CASE WHEN q.new_qb IS NOT NULL AND c.call_no IN (1, 2, 3) THEN 'Didn''t come up' ELSE c.verdict END AS verdict,
        CASE WHEN c.verdict = 'Called it' THEN 'Hurt us' END AS outcome   -- what it did on the field
 FROM calls c
-JOIN m USING (season, week, team);
+JOIN m USING (season, week, team)
+LEFT JOIN qb_change q USING (season, week, team);
