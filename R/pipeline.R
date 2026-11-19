@@ -148,6 +148,22 @@ load_gamebook_weather <- function(con, path = "reference/gamebook_weather_2017_2
   invisible(wx)
 }
 
+# GET a URL, trying up to `tries` times with a pause between (Open-Meteo has
+# timed out on a single connect attempt; one blip shouldn't blank the forecast).
+fetch_with_retry <- function(url, tries = 3, pause = c(5, 15)) {
+  for (i in seq_len(tries)) {
+    res <- tryCatch({
+      r <- curl::curl_fetch_memory(url, handle = curl::new_handle(timeout = 60, connecttimeout = 20))
+      if (r$status_code != 200) stop("HTTP ", r$status_code)
+      r
+    }, error = function(e) e)
+    if (!inherits(res, "error")) return(res)
+    if (i == tries) stop(conditionMessage(res), " (", tries, " tries)")
+    message("Fetch failed (try ", i, " of ", tries, "): ", conditionMessage(res), "; retrying")
+    Sys.sleep(pause[min(i, length(pause))])
+  }
+}
+
 # Hourly forecast (Open-Meteo, free, no key) at each stadium with a game in the
 # next `days` days, written to raw_weather_hourly. Domes are fetched too; the
 # SQL (36_game_weather.sql) marks them neutral. Like the side feeds, a failed
@@ -179,8 +195,7 @@ fetch_weather <- function(con, run_date, days = 7) {
         "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch",
         "&timezone=America%2FNew_York",
         "&start_date=", min(games$gameday), "&end_date=", format(as.Date(max(games$gameday)) + 1))
-      res <- curl::curl_fetch_memory(url, handle = curl::new_handle(timeout = 60))
-      if (res$status_code != 200) stop("HTTP ", res$status_code)
+      res <- fetch_with_retry(url)
       body <- jsonlite::fromJSON(rawToChar(res$content), simplifyVector = FALSE)
       if (!is.null(body$hourly)) body <- list(body)  # one location comes back unwrapped
       fetched <- format(Sys.time(), "%Y-%m-%d %H:%M UTC", tz = "UTC")
