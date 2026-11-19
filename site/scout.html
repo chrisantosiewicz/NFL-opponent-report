@@ -554,8 +554,6 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
         </div>
         <div class="box"><h2>Win chance</h2>
           <div class="wp">
-            ${w2 == null ? "" : `<div><div class="lab"><span><span class="est">Model estimate</span> · W2 (newest model)</span></div>
-              <div class="lab"><span>${esc(team)} <b>${pct(w2)}</b></span><span>${esc(opp.team)} <b>${pct(1 - w2)}</b></span></div>${bar(w2, info.color, opp.color)}</div>`}
             <div><div class="lab"><span><span class="est">Model estimate</span> · ${esc(ln.model_version)}</span></div>
               <div class="lab"><span>${esc(team)} <b>${pct(model)}</b></span><span>${esc(opp.team)} <b>${pct(1 - model)}</b></span></div>${bar(model, info.color, opp.color)}</div>
             ${market == null ? "" : `<div><div class="lab"><span>Market (moneylines, margin removed)</span></div>
