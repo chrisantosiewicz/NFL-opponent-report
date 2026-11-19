@@ -9,10 +9,10 @@
 # The laptop must be on (or wake) at those times; a missed run starts when it
 # comes back on. Remove with: Unregister-ScheduledTask -TaskName "NFL W2 refresh"
 #
-#   powershell -ExecutionPolicy Bypass -File _tools\install_w2_schedule.ps1 [-DataRefresh "uv run betting ..."]
+#   powershell -ExecutionPolicy Bypass -File _tools\install_w2_schedule.ps1
 #
-# -DataRefresh: the betting repo's 2026 schedule + play-by-play fetch command,
-# passed through to w2_refresh.ps1 (see there). Re-run this script to change it.
+# Optional -DataRefresh "<command>" replaces w2_refresh.ps1's default 2026 data
+# refresh (see there). Re-run this script to change it.
 
 param([string]$DataRefresh = "")
 

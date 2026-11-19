@@ -1,6 +1,6 @@
 # Refresh W2's predictions on the live site (runs on Chris's laptop).
 #
-#   1. in the betting repo: refreshes the 2026 game data (-DataRefresh, if set),
+#   1. in the betting repo: refreshes the 2026 game data (schedule, live pbp),
 #      rebuilds W2's features (`betting predict build-features`), then runs W2
 #      for this NFL week (`betting predict week`). Predict only: never refits.
 #   2. copies the newest run into config/w2_predictions.csv (_tools/w2_to_csv.py),
@@ -19,12 +19,20 @@ param(
     # The Tuesday of week 1 (weeks turn over on Tuesdays). 2026: Thu Sep 10 opener.
     [datetime]$Week1Tuesday = "2026-09-08",
     [int]$Week = 0,  # 0 = work it out from today's date
-    # The betting repo's 2026 schedule + live play-by-play fetch, run from
-    # $BettingDir before build-features, e.g. "uv run betting <command> ...".
-    # 2026 only: never 2025 (the held-out season), no Odds API. Blank = skip
-    # (W2 then uses whatever game data the betting repo already has).
-    [string]$DataRefresh = ""
+    # Override the betting repo's data refresh with another command (run from
+    # $BettingDir). Blank = the default below.
+    [string]$DataRefresh = "",
+    [switch]$SkipDataRefresh
 )
+
+# The betting repo's weekly data refresh (from its "Add predictions" thread,
+# as run on Nov 19): download ONLY the 2026 schedule, rebuild games.parquet
+# from the stored raw schedules, pull 2026 live play-by-play and weekly player
+# stats. Nothing for 2025 (the held-out season), no Odds API. Do not swap in
+# `betting build` (reads raw 2025 pbp), `betting insights refresh` or
+# `betting nfl fetch-pbp`.
+$DefaultRefresh = 'uv run python -c "from datetime import UTC, datetime; from pathlib import Path; from betting.nfl import pipeline; from betting.insights.live_data import fetch_live; d=Path(''data''); now=datetime.now(UTC); print(pipeline.fetch_schedules(d,[2026],now)); g=pipeline.build(d); print(pipeline.games_report(g,[2026])[1]); print(fetch_live(d,2026,now))"'
+if (-not $DataRefresh) { $DataRefresh = $DefaultRefresh }
 
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
@@ -40,12 +48,13 @@ try {
     Push-Location $BettingDir
     try {
         $data = Join-Path $BettingDir "data"
-        if ($DataRefresh) {
-            Log "Data refresh: $DataRefresh"
+        $env:UV_CACHE_DIR = Join-Path $BettingDir ".venv\uv-cache"
+        if ($SkipDataRefresh) {
+            Log "Skipping the data refresh: using the betting repo's current game data."
+        } else {
+            Log "Data refresh (2026 schedule, live play-by-play)"
             Invoke-Expression $DataRefresh
             if ($LASTEXITCODE -ne 0) { throw "data refresh exited $LASTEXITCODE" }
-        } else {
-            Log "No -DataRefresh set: using the betting repo's current game data."
         }
         uv run betting predict build-features --data-dir $data
         if ($LASTEXITCODE -ne 0) { throw "betting predict build-features exited $LASTEXITCODE" }
