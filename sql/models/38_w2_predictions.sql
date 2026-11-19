@@ -9,7 +9,7 @@
 
 CREATE OR REPLACE TABLE w2_predictions AS
 SELECT
-    w.season, w.week, w.game_id, s.gameday,
+    w.season, w.week, w.game_id, CAST(s.gameday AS DATE) AS gameday,
     s.home_team, s.away_team,
     w.w2_home_win,
     w.w2_home_margin,
