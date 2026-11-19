@@ -137,6 +137,18 @@ load_stadiums <- function(con, path = "config/stadiums.csv") {
   invisible(stadiums)
 }
 
+# W2 predictions from Chris's betting repo (config/w2_predictions.csv, written on
+# his laptop by _tools/w2_to_csv.py). Loaded on every run, like the manual
+# trades; 38_w2_predictions.sql keeps the rows for games in the schedule.
+load_w2_predictions <- function(con, path = "config/w2_predictions.csv") {
+  w2 <- read.csv(path, na.strings = "", comment.char = "#",
+                 colClasses = c("integer", "integer", "character", "character", "character",
+                                "numeric", "numeric", "numeric", "character", "character"))
+  dbWriteTable(con, "raw_w2_predictions", w2, overwrite = TRUE)
+  message("raw_w2_predictions: ", nrow(w2), " games")
+  invisible(w2)
+}
+
 # Gamebook kickoff weather for 2017-2023, the seasons load_raw_data() doesn't
 # pull (reference/gamebook_weather_2017_2023.csv, from nflverse play-by-play).
 # Later seasons come from raw_pbp's weather column. Fixed history: never edited.
@@ -146,6 +158,22 @@ load_gamebook_weather <- function(con, path = "reference/gamebook_weather_2017_2
   dbWriteTable(con, "raw_gamebook_weather", wx, overwrite = TRUE)
   message("raw_gamebook_weather: ", nrow(wx), " games")
   invisible(wx)
+}
+
+# GET a URL, trying up to `tries` times with a pause between (Open-Meteo has
+# timed out on a single connect attempt; one blip shouldn't blank the forecast).
+fetch_with_retry <- function(url, tries = 3, pause = c(5, 15)) {
+  for (i in seq_len(tries)) {
+    res <- tryCatch({
+      r <- curl::curl_fetch_memory(url, handle = curl::new_handle(timeout = 60, connecttimeout = 20))
+      if (r$status_code != 200) stop("HTTP ", r$status_code)
+      r
+    }, error = function(e) e)
+    if (!inherits(res, "error")) return(res)
+    if (i == tries) stop(conditionMessage(res), " (", tries, " tries)")
+    message("Fetch failed (try ", i, " of ", tries, "): ", conditionMessage(res), "; retrying")
+    Sys.sleep(pause[min(i, length(pause))])
+  }
 }
 
 # Hourly forecast (Open-Meteo, free, no key) at each stadium with a game in the
@@ -179,8 +207,7 @@ fetch_weather <- function(con, run_date, days = 7) {
         "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch",
         "&timezone=America%2FNew_York",
         "&start_date=", min(games$gameday), "&end_date=", format(as.Date(max(games$gameday)) + 1))
-      res <- curl::curl_fetch_memory(url, handle = curl::new_handle(timeout = 60))
-      if (res$status_code != 200) stop("HTTP ", res$status_code)
+      res <- fetch_with_retry(url)
       body <- jsonlite::fromJSON(rawToChar(res$content), simplifyVector = FALSE)
       if (!is.null(body$hourly)) body <- list(body)  # one location comes back unwrapped
       fetched <- format(Sys.time(), "%Y-%m-%d %H:%M UTC", tz = "UTC")
@@ -346,6 +373,18 @@ export_predictions <- function(con, season, week, run_date, site_dir = "site") {
   } else {
     dbExecute(con, "CREATE OR REPLACE TABLE raw_prediction_locks (game_id VARCHAR, model_home_win DOUBLE,
       market_home_win DOUBLE, home_line DOUBLE, total_line DOUBLE, model_version VARCHAR, locked_at VARCHAR)")
+  }
+  # W2's calls are locked the same way, on their own clock (W2 arrived after
+  # Elo's week 11 calls were locked). Files written before W2 have no w2 fields.
+  dbExecute(con, "CREATE OR REPLACE TABLE raw_w2_locks (game_id VARCHAR, w2_home_win DOUBLE,
+    w2_home_margin DOUBLE, w2_total DOUBLE, w2_fit_run_id VARCHAR, w2_locked_at VARCHAR)")
+  if (file.exists(path)) {
+    has_w2 <- tryCatch(nrow(dbGetQuery(con, sprintf("SELECT 1 FROM (SELECT unnest(games) AS g FROM read_json('%s'))
+      WHERE g.w2_home_win IS NOT NULL LIMIT 1", path))) > 0, error = function(e) FALSE)
+    if (has_w2) dbExecute(con, sprintf("INSERT INTO raw_w2_locks
+      SELECT game_id, w2_home_win, w2_home_margin, w2_total, w2_fit_run_id, w2_locked_at
+      FROM (SELECT unnest(games, recursive := true) FROM read_json('%s'))
+      WHERE w2_home_win IS NOT NULL", path))
   }
   run_sql_template(con, "sql/export/site_predictions.sql", season = as.integer(season),
                    week = as.integer(week), run_date = format(as.Date(run_date)), path = path,

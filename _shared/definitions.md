@@ -24,7 +24,7 @@ The factory for this repo: stable across runs. Change a rule here and in the one
 
 ## Betting lines and predictions (added Nov 11, 2026)
 
-Implemented in `sql/models/07_stg_market_lines.sql`, `32_elo_ratings.sql`, `33_game_predictions.sql` and `34_betting_trends.sql`.
+Implemented in `sql/models/07_stg_market_lines.sql`, `32_elo_ratings.sql`, `33_game_predictions.sql`, `34_betting_trends.sql` and `38_w2_predictions.sql`.
 
 | Item | Definition |
 |------|-----------|
@@ -35,6 +35,9 @@ Implemented in `sql/models/07_stg_market_lines.sql`, `32_elo_ratings.sql`, `33_g
 | Win % | Predicted home margin = 0.0422 x adjusted Elo gap; final margin normal around it (sd 13.22) rounded to whole points; a tie counts half. |
 | Shown | Win % only, labeled "model estimate", next to the market's. No cover %, over % or edge: his 2019-2024 backtest found no signal there (49.1% ATS, 49.9% totals). |
 | Lock | A game's win % is locked in `site/data/predictions-<season>.json` the first time a run sees it in the report week before game day, and never rewritten. Grades (right/wrong, log loss vs the market) use the final score; ties are not graded. |
+| W2 (added Nov 19, 2026) | Chris's newest model from his betting repo: M6 ridge plus game-day rain and wind, trained 2017-2024 (2025 held out), live weather inputs are forecasts. Not rebuilt here: the laptop runs it and commits `config/w2_predictions.csv` (newest run per game) via `_tools/w2_to_csv.py`; `sql/models/38_w2_predictions.sql` reads it. |
+| W2 shown | Win % (labeled "model estimate", above Elo's), plus its predicted margin as a line (rounded to the half point) and its predicted total. Its cover and over chances are not copied or shown, and no edge is claimed. |
+| W2 lock | Same rule as Elo, on its own clock: the `w2_*` fields of a game in `predictions-<season>.json` are locked the first time a run sees W2's number before kickoff, and graded the same way. |
 | Trends | ATS, straight-up and over/under records against each game's closing line, over the same windows as the tendencies (games before the week; season and last 4). A push is its own column. Fewer than 4 games is marked small. |
 
 ## Injuries and game-day weather (added Nov 11, 2026)

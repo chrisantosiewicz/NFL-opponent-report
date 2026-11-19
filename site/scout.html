@@ -221,7 +221,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
 <main class="wrap" id="app"><p class="empty">Loading this week's numbers…</p></main>
 
 <footer class="wrap">
-  <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. The win chance is a model estimate from an Elo rating (every team's strength, updated after each game, with home field and rest after a bye) and is shown next to the market's chance from the moneylines with the bookmaker's margin removed. Only win chances are shown: the model has not shown an edge against the spread or on totals. Trend records count each game against its closing line. Player trends come from the play-by-play, so they can differ slightly from official box scores; per-game averages use the games the player played. They are trends next to what the defense allows, not prop picks: there are no prop lines here. Only games before this week are used.</p>
+  <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. Win chances are model estimates, shown next to the market's chance from the moneylines with the bookmaker's margin removed. W2 is the newest model: a ridge-regression model (M6) plus the game-day rain and wind forecast, trained on 2017-2024 games; its line is its predicted margin rounded to the half point, and its total is its predicted points. Elo is the original: every team's strength, updated after each game, with home field and rest after a bye. Neither is a pick against the spread or the total. Trend records count each game against its closing line. Player trends come from the play-by-play, so they can differ slightly from official box scores; per-game averages use the games the player played. They are trends next to what the defense allows, not prop picks: there are no prop lines here. Only games before this week are used.</p>
   <p id="how-attack" hidden><strong>How to read this.</strong> The attack plan puts one offense next to the defense it faces this week. Run sides and pass areas are from the offense's view (left, middle, right of the offense) on both sides, using neutral downs (win probability 5-95%). A defense's rank of 1 means it allows the most EPA per play there; "soft spot" is the worst quarter of the league, "tough" the best quarter. Blitz, box and play action are this season's FTN charting; man/zone is last season's, the latest public. Only games before this week are used.</p>
   <p id="how-scout"><strong>How to read this.</strong> Every dot is one NFL team, ranked on the same plays. The big dot is the team you picked, the dark line is the league average. Pass rate counts sacks and scrambles as passes. Pass rate over expected compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse xpass model). EPA is expected points added per play; above 0 helps the offense. Early downs, 3rd down, red zone and all neutral use only plays with the offense's win probability between 5% and 95%; 2-minute and trailing by 8+ use every play. Numbers on fewer than 30 plays are greyed and marked * and never make "What stands out". Only games before this week are used.</p>
   <p id="foot-meta"></p>
@@ -533,6 +533,8 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
       const teamMl = game.is_home ? ln.home_moneyline : ln.away_moneyline, oppMl = game.is_home ? ln.away_moneyline : ln.home_moneyline;
       const model = game.is_home ? ln.model_home_win : 1 - ln.model_home_win;
       const market = ln.market_home_win == null ? null : game.is_home ? ln.market_home_win : 1 - ln.market_home_win;
+      const w2 = ln.w2_home_win == null ? null : game.is_home ? ln.w2_home_win : 1 - ln.w2_home_win;
+      const w2Line = ln.w2_home_line == null ? null : game.is_home ? ln.w2_home_line : -ln.w2_home_line;
       const bar = (p, c1, c2) => `<div class="bar2"><span style="width:${(100 * p).toFixed(1)}%;background:${esc(c1)}"></span><span style="width:${(100 - 100 * p).toFixed(1)}%;background:${esc(c2)};opacity:.55"></span></div>`;
       top = `<section class="lead">
         <div class="box"><h2>Current lines</h2>
@@ -545,6 +547,9 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
         </div>
         <div class="box"><h2>Win chance</h2>
           <div class="wp">
+            ${w2 == null ? "" : `<div><div class="lab"><span><span class="est">Model estimate</span> · W2 (newest model)</span></div>
+              <div class="lab"><span>${esc(team)} <b>${pct(w2)}</b></span><span>${esc(opp.team)} <b>${pct(1 - w2)}</b></span></div>${bar(w2, info.color, opp.color)}
+              <div class="lab"><span class="muted">W2's line: ${esc(team)} ${lineTxt(Math.round(2 * w2Line) / 2)} · total ${ln.w2_total ?? "–"}</span></div></div>`}
             <div><div class="lab"><span><span class="est">Model estimate</span> · ${esc(ln.model_version)}</span></div>
               <div class="lab"><span>${esc(team)} <b>${pct(model)}</b></span><span>${esc(opp.team)} <b>${pct(1 - model)}</b></span></div>${bar(model, info.color, opp.color)}</div>
             ${market == null ? "" : `<div><div class="lab"><span>Market (moneylines, margin removed)</span></div>
@@ -580,8 +585,10 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
     const right = g.filter(x => x.model_correct).length;
     const ll = a => a.reduce((s, x) => s + x, 0) / a.length;
     const gm = g.filter(x => x.market_log_loss != null);
-    return `<p class="muted" style="margin:10px 0 0">This season (calls locked before kickoff): ${right}-${g.length - right} picking winners.
-      Log loss ${ll(g.map(x => x.model_log_loss)).toFixed(3)}${gm.length ? ` vs the market's ${ll(gm.map(x => x.market_log_loss)).toFixed(3)}` : ""} (lower is better). ${esc(preds.model_settings || "")}</p>`;
+    const w = preds.games.filter(x => x.w2_correct != null), wr = w.filter(x => x.w2_correct).length;
+    const w2Rec = w.length ? ` W2 (live since week 11): ${wr}-${w.length - wr}, log loss ${ll(w.map(x => x.w2_log_loss)).toFixed(3)}.` : "";
+    return `<p class="muted" style="margin:10px 0 0">This season (calls locked before kickoff): Elo ${right}-${g.length - right} picking winners.
+      Log loss ${ll(g.map(x => x.model_log_loss)).toFixed(3)}${gm.length ? ` vs the market's ${ll(gm.map(x => x.market_log_loss)).toFixed(3)}` : ""} (lower is better).${w2Rec} ${esc(preds.model_settings || "")}</p>`;
   }
 
   // ---- Attack plan: one offense vs the defense it faces -------------------
