@@ -16,6 +16,11 @@ on:
     - cron: "0 14 * 9-12,1,2 6"
     - cron: "0 11 * 9-12,1,2 0"
     - cron: "0 14 * 9-12,1,2 1"
+  # The laptop pushes W2's newest predictions (_tools/w2_refresh.ps1): rebuild
+  # the live page's data right away, as an update run.
+  push:
+    branches: [main]
+    paths: [config/w2_predictions.csv]
   workflow_dispatch:
     inputs:
       mode:
@@ -61,7 +66,7 @@ jobs:
       - name: Run pipeline
         env:
           SCHEDULE: ${{ github.event.schedule }}
-          MODE_INPUT: ${{ inputs.mode }}
+          MODE_INPUT: ${{ github.event_name == 'push' && 'update' || inputs.mode }}
         run: |
           if [ -z "$REPORT_DATE" ]; then unset REPORT_DATE; fi
           # Tuesday and Wednesday crons are full runs; the other crons are updates.

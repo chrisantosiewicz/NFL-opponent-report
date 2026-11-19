@@ -17,8 +17,8 @@ Start here, then read at most one `CONTEXT.md`. The pipeline in one screen: [CON
 | `report/` | the Quarto one-pager: [contract](report/CONTEXT.md) |
 | `site/` | what GitHub Pages serves: [contract](site/CONTEXT.md); staff notes: [contract](site/notes/CONTEXT.md) |
 | `reference/` | fixed history files (2017-2023 gamebook weather), never edited |
-| `_tools/` | `links.py` checks every link and input path in the docs; `w2_to_csv.py` copies W2 predictions from the betting repo into `config/` |
-| `.github/workflows/` | Tuesday run, Wednesday retry, Thu/Sat/Sun/Mon updates, publish to Pages |
+| `_tools/` | `links.py` checks every link and input path in the docs; `w2_to_csv.py` copies W2 predictions from the betting repo into `config/`; `w2_refresh.ps1` / `install_w2_schedule.ps1` run and push W2 on the laptop's schedule |
+| `.github/workflows/` | Tuesday run, Wednesday retry, Thu/Sat/Sun/Mon updates, an update on every W2 push, publish to Pages |
 
 ## Route by task
 
