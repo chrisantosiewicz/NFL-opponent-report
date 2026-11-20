@@ -561,7 +561,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
           </div>
           ${modelRecord(preds)}
         </div>
-      </section>`;
+      </section>${gameFlow(d, ln, team, info, opp)}`;
     }
     // --- trends, both teams side by side
     const cols = [info, ...(opp ? [opp] : [])];
@@ -593,6 +593,37 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
     const w2Rec = w.length ? ` W2 (live since week 11): ${wr}-${w.length - wr}, log loss ${ll(w.map(x => x.w2_log_loss)).toFixed(3)}.` : "";
     return `<p class="muted" style="margin:10px 0 0">This season (calls locked before kickoff): Elo ${right}-${g.length - right} picking winners.
       Log loss ${ll(g.map(x => x.model_log_loss)).toFixed(3)}${gm.length ? ` vs the market's ${ll(gm.map(x => x.market_log_loss)).toFixed(3)}` : ""} (lower is better).${w2Rec} ${esc(preds.model_settings || "")}</p>`;
+  }
+
+  // ---- How the game should go: the model's game script plus what to watch from
+  // each offense (the "What to look for on defense" bullets of each team's draft notes).
+  function gameFlow(d, ln, team, info, opp) {
+    const half = x => Math.round(2 * x) / 2;
+    let script = "";
+    if (ln.w2_home_line != null && ln.w2_total != null) {
+      const m = -ln.w2_home_line, tot = ln.w2_total;
+      const homePts = half((tot + m) / 2), awayPts = half((tot - m) / 2);
+      const fav = m >= 0 ? ln.home_team : ln.away_team, by = half(Math.abs(m));
+      const mkt = ln.home_line == null ? "" : (() => {
+        const mm = -ln.home_line, mfav = mm >= 0 ? ln.home_team : ln.away_team;
+        const closer = Math.abs(m) < Math.abs(mm) - 1.5 ? "a closer game than the market" : Math.abs(m) > Math.abs(mm) + 1.5 ? "a wider gap than the market" : "about the same margin as the market";
+        const pts = ln.total_line == null ? "" : tot > ln.total_line + 1.5 ? ", with more scoring" : tot < ln.total_line - 1.5 ? ", with less scoring" : ", with about the same scoring";
+        return ` That's ${closer} (${esc(mfav)} by ${Math.abs(ln.home_line)}, total ${ln.total_line ?? "–"})${pts}.`;
+      })();
+      script = `<p>My model (W2) sees ${by === 0 ? "a toss-up" : `${esc(fav)} by ${by}`} in a ${half(tot).toFixed(1)}-point game: about ${esc(ln.away_team)} ${awayPts}, ${esc(ln.home_team)} ${homePts}.${mkt}</p>`;
+    }
+    const watch = t => (d.drafts || []).filter(r => r.team === t.team && r.kind === "li" && r.line > 20 && r.line < 50)
+      .sort((a, b) => a.line - b.line).slice(0, 3);
+    const cols = [info, opp].map(t => {
+      const items = watch(t);
+      return `<div><h3 style="margin:8px 0 4px;font-size:14px">${esc(t.nick)} offense</h3>${items.length
+        ? `<ul style="margin:0;padding-left:18px">${items.map(r => `<li>${esc(r.text)}</li>`).join("")}</ul>`
+        : `<p class="muted" style="margin:0">Nothing flagged this week.</p>`}</div>`;
+    }).join("");
+    if (!script && !cols) return "";
+    return `<div class="box" style="margin-top:4px"><h2>How the game should go</h2>${script}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">${cols}</div>
+      <p class="muted" style="margin:10px 0 0">The score is W2's margin and total split into points. What to watch comes from each team's tendencies this season, from the scouting notes.</p></div>`;
   }
 
   // ---- Attack plan: one offense vs the defense it faces -------------------

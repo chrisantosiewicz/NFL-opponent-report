@@ -189,8 +189,10 @@ move_text AS (
                ELSE concat('; ', from_games_since, ' of their ', from_games, ' games came without him.') END)
           ELSE concat('We added ', position, ' ', player_name, ' from the ', COALESCE(from_nick, from_team), ' on ',
                note_day(trade_date), CASE WHEN to_games_since = 0 THEN ', and this is his first game with us.' ELSE '.' END)
-        END AS sentence,
-        CASE WHEN kind = 'off_in' THEN
+        END || CASE WHEN inj_status IS NOT NULL
+                    THEN concat(' He is listed ', lower(inj_status), ' this week', ' (' || lower(inj_injury) || ')', '.') ELSE '' END AS sentence,
+        CASE WHEN inj_status IS NOT NULL THEN NULL
+             WHEN kind = 'off_in' THEN
           CASE WHEN position IN ('G', 'T', 'C', 'OL', 'OT', 'OG') THEN
                  concat('Early runs behind ', player_name, '. If they run at him on the first two series, that''s the trade showing up.')
                WHEN position IN ('WR', 'TE') THEN
@@ -201,7 +203,14 @@ move_text AS (
              WHEN kind = 'their_def_in' THEN
                concat('Where ', player_name, ' lines up on their defense, and whether we test him early.')
         END AS look_for
-    FROM moves
+    FROM (   -- a new arrival on the current injury report as Out or Doubtful is noted, and not watched for
+        SELECT mv.*, inj.report_status AS inj_status, inj.injury AS inj_injury
+        FROM moves mv
+        LEFT JOIN stg_injuries inj
+          ON inj.season = mv.season AND inj.week = mv.week AND inj.team = mv.to_team AND inj.gsis_id = mv.gsis_id
+         AND inj.report_status IN ('Out', 'Doubtful')
+         AND mv.kind IN ('off_in', 'their_def_in', 'our_off_in')
+    ) mv
     WHERE move_no <= 4
 ),
 
@@ -558,13 +567,13 @@ lines AS (
     UNION ALL SELECT season, week, team, 51, 'li', li_early FROM attack WHERE li_early IS NOT NULL
     UNION ALL SELECT season, week, team, 52, 'li', li_position FROM attack WHERE li_position IS NOT NULL
     UNION ALL
-    SELECT season, week, team, 52 + move_no, 'li', look_for FROM move_text WHERE kind = 'their_def_in'
+    SELECT season, week, team, 52 + move_no, 'li', look_for FROM move_text WHERE kind = 'their_def_in' AND look_for IS NOT NULL
     UNION ALL
     SELECT p.season, p.week, p.team, 20 + mt.move_no, 'li',
            concat(mt.look_for, CASE WHEN p.our_adds IS NOT NULL AND mt.position IN ('G', 'T', 'C', 'OL', 'OT', 'OG', 'RB')
                                     THEN concat(' See whether ', p.our_adds, ' is winning those snaps.') END)
     FROM paragraphs p
-    JOIN move_text mt ON mt.season = p.season AND mt.week = p.week AND mt.team = p.team AND mt.kind = 'off_in'
+    JOIN move_text mt ON mt.season = p.season AND mt.week = p.week AND mt.team = p.team AND mt.kind = 'off_in' AND mt.look_for IS NOT NULL
     UNION ALL SELECT season, week, team, 30, 'li', li_formation FROM paragraphs WHERE li_formation IS NOT NULL
     UNION ALL SELECT season, week, team, 31, 'li', li_target FROM paragraphs WHERE li_target IS NOT NULL
     UNION ALL
