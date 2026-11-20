@@ -227,9 +227,39 @@ fetch_weather <- function(con, run_date, days = 7) {
       empty
     })
   }
+  rows <- lock_weather(con, rows)
   dbWriteTable(con, "raw_weather_hourly", rows, overwrite = TRUE)
   message("raw_weather_hourly: ", nrow(rows), " rows for ", length(unique(rows$game_id)), " games")
   invisible(rows)
+}
+
+# Kept forecasts (site/data/weather-locked.csv, committed with the site data):
+# each game's kickoff-window hours (kickoff and the two hours after, as
+# 36_game_weather.sql reads them) from the last fetch that had them. A game
+# that has kicked off keeps its kept forecast, so its page shows the last
+# forecast before kickoff; a game the fetch missed (a failed fetch) keeps its
+# last one too. Only upcoming games the fetch returned are replaced.
+lock_weather <- function(con, rows, path = "site/data/weather-locked.csv") {
+  kick <- dbGetQuery(con, "
+    SELECT game_id, CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5) AS kickoff
+    FROM raw_schedules WHERE gametime IS NOT NULL")
+  kick$at <- as.POSIXct(kick$kickoff, format = "%Y-%m-%d %H:%M", tz = "America/New_York")
+  in_window <- function(r) {
+    k <- kick$at[match(r$game_id, kick$game_id)]
+    t <- as.POSIXct(r$time, format = "%Y-%m-%dT%H:%M", tz = "America/New_York")
+    !is.na(k) & !is.na(t) & t >= trunc(k, "hours") & t < trunc(k, "hours") + 3 * 3600
+  }
+  kept <- if (file.exists(path)) read.csv(path, colClasses = "character") else rows[0, ]
+  kept <- kept[, WEATHER_COLUMNS]
+  started <- kick$game_id[!is.na(kick$at) & kick$at <= Sys.time()]
+  fresh <- rows[in_window(rows) & !(rows$game_id %in% started), ]
+  kept <- kept[!(kept$game_id %in% fresh$game_id), ]
+  out <- rbind(kept, fresh)
+  out <- out[out$game_id %in% kick$game_id, ]  # seasons still loaded only
+  out <- out[order(out$game_id, out$time), ]
+  write.csv(out, path, row.names = FALSE)
+  # The page reads only the kickoff window, so the kept hours stand in for a game's fetch.
+  rbind(rows[!(rows$game_id %in% out$game_id), ], out)
 }
 
 # Run every .sql file in a folder, in file-name order (01_, 02_, 10_, ...).
@@ -349,12 +379,46 @@ export_site_data <- function(con, season, week, focal_team, site_dir = "site") {
   data_dir <- file.path(site_dir, "data")
   dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
   path <- file.path(normalizePath(data_dir), sprintf("%d-week%02d.json", as.integer(season), as.integer(week)))
+  before <- if (file.exists(path)) jsonlite::fromJSON(path, simplifyVector = FALSE) else NULL
   run_sql_template(con, "sql/export/site_week.sql",
                    season = as.integer(season), week = as.integer(week),
                    focal_team = focal_team, path = path, updated = updated_stamp())
+  freeze_started_games(con, season, week, path, before)
   run_sql_template(con, "sql/export/site_index.sql", dir = normalizePath(data_dir))
   message("exported ", path)
   invisible(path)
+}
+
+# Game freeze: once a game kicks off, its two teams' rows on the week page
+# stay as the last run before kickoff wrote them (scouting numbers, notes,
+# lines, injuries, trends), so a run after the game can't rewrite what the
+# page said going in. Team list, schedule, weather history and weather (kept
+# by lock_weather()) are not frozen.
+FREEZE_SKIP <- c("teams", "games", "weather_history", "weather")
+freeze_started_games <- function(con, season, week, path, before) {
+  if (is.null(before)) return(invisible())
+  kick <- dbGetQuery(con, "
+    SELECT game_id, home_team, away_team,
+           CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5) AS kickoff
+    FROM raw_schedules WHERE CAST(season AS INTEGER) = ? AND CAST(week AS INTEGER) = ? AND gametime IS NOT NULL",
+    params = list(as.integer(season), as.integer(week)))
+  at <- as.POSIXct(kick$kickoff, format = "%Y-%m-%d %H:%M", tz = "America/New_York")
+  kick <- kick[!is.na(at) & at <= Sys.time(), ]
+  if (nrow(kick) == 0) return(invisible())
+  teams <- c(kick$home_team, kick$away_team)
+  hit <- function(r) isTRUE(r$team %in% teams) || isTRUE(r$game_id %in% kick$game_id) ||
+    isTRUE(r$home_team %in% teams) || isTRUE(r$away_team %in% teams)
+  after <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+  for (k in setdiff(names(after), FREEZE_SKIP)) {
+    new <- after[[k]]; old <- before[[k]]
+    if (!is.list(new) || !is.list(old) || !length(old) || !is.list(old[[1]])) next
+    keep_new <- Filter(function(r) !(is.list(r) && hit(r)), new)
+    keep_old <- Filter(function(r) is.list(r) && hit(r), old)
+    after[[k]] <- c(keep_new, keep_old)
+  }
+  writeLines(jsonlite::toJSON(after, auto_unbox = TRUE, null = "null", na = "null", digits = NA), path)
+  message("froze ", length(unique(teams)), " teams whose games have started")
+  invisible()
 }
 
 # Writes site/data/predictions-<season>.json: the model's win % for every game,
@@ -530,15 +594,33 @@ warn_run <- function(text, title = "Trade check") {
   if (identical(Sys.getenv("GITHUB_ACTIONS"), "true")) cat("::warning title=", title, "::", text, "\n", sep = "")
 }
 
+# TRUE once the game's kickoff (schedule time, US Eastern) has passed.
+game_started <- function(game_id, db_path = "data/nfl.duckdb") {
+  if (is.null(game_id) || is.na(game_id)) return(FALSE)
+  con <- DBI::dbConnect(duckdb::duckdb(), db_path, read_only = TRUE)
+  on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
+  k <- DBI::dbGetQuery(con, "SELECT CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5) AS kickoff
+                             FROM raw_schedules WHERE game_id = ? AND gametime IS NOT NULL", params = list(game_id))
+  if (nrow(k) == 0) return(FALSE)
+  at <- as.POSIXct(k$kickoff[1], format = "%Y-%m-%d %H:%M", tz = "America/New_York")
+  !is.na(at) && at <= Sys.time()
+}
+
 report_slug <- function(season, week, opponent) {
   sprintf("%d-week%02d-%s", as.integer(season), as.integer(week), opponent)
 }
 
 # Render the one-pager for one opponent. Writes site/reports/<slug>.html (and
 # .pdf when Chrome is available) and returns the slug.
-render_report <- function(game, db_path = "data/nfl.duckdb", out_dir = "site/reports") {
+render_report <- function(game, db_path = "data/nfl.duckdb", out_dir = "site/reports", force = FALSE) {
   slug <- report_slug(game$season, game$week, game$opponent)
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+  # Report freeze: once the game kicks off, the one-pager stays as the last
+  # render before kickoff (like the live page). A manual --opponent run forces it.
+  if (!force && file.exists(file.path(out_dir, paste0(slug, ".html"))) && game_started(game$game_id, db_path)) {
+    message("kept ", slug, ": the game has started")
+    return(slug)
+  }
 
   args <- c(
     "render", "opponent_report.qmd",
