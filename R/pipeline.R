@@ -227,9 +227,39 @@ fetch_weather <- function(con, run_date, days = 7) {
       empty
     })
   }
+  rows <- lock_weather(con, rows)
   dbWriteTable(con, "raw_weather_hourly", rows, overwrite = TRUE)
   message("raw_weather_hourly: ", nrow(rows), " rows for ", length(unique(rows$game_id)), " games")
   invisible(rows)
+}
+
+# Kept forecasts (site/data/weather-locked.csv, committed with the site data):
+# each game's kickoff-window hours (kickoff and the two hours after, as
+# 36_game_weather.sql reads them) from the last fetch that had them. A game
+# that has kicked off keeps its kept forecast, so its page shows the last
+# forecast before kickoff; a game the fetch missed (a failed fetch) keeps its
+# last one too. Only upcoming games the fetch returned are replaced.
+lock_weather <- function(con, rows, path = "site/data/weather-locked.csv") {
+  kick <- dbGetQuery(con, "
+    SELECT game_id, CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5) AS kickoff
+    FROM raw_schedules WHERE gametime IS NOT NULL")
+  kick$at <- as.POSIXct(kick$kickoff, format = "%Y-%m-%d %H:%M", tz = "America/New_York")
+  in_window <- function(r) {
+    k <- kick$at[match(r$game_id, kick$game_id)]
+    t <- as.POSIXct(r$time, format = "%Y-%m-%dT%H:%M", tz = "America/New_York")
+    !is.na(k) & !is.na(t) & t >= trunc(k, "hours") & t < trunc(k, "hours") + 3 * 3600
+  }
+  kept <- if (file.exists(path)) read.csv(path, colClasses = "character") else rows[0, ]
+  kept <- kept[, WEATHER_COLUMNS]
+  started <- kick$game_id[!is.na(kick$at) & kick$at <= Sys.time()]
+  fresh <- rows[in_window(rows) & !(rows$game_id %in% started), ]
+  kept <- kept[!(kept$game_id %in% fresh$game_id), ]
+  out <- rbind(kept, fresh)
+  out <- out[out$game_id %in% kick$game_id, ]  # seasons still loaded only
+  out <- out[order(out$game_id, out$time), ]
+  write.csv(out, path, row.names = FALSE)
+  # The page reads only the kickoff window, so the kept hours stand in for a game's fetch.
+  rbind(rows[!(rows$game_id %in% out$game_id), ], out)
 }
 
 # Run every .sql file in a folder, in file-name order (01_, 02_, 10_, ...).

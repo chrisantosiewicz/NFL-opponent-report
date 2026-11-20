@@ -475,6 +475,8 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
     const where = esc(w.stadium || "");
     if (w.neutral) return `<div class="box"><h2>Game-day weather</h2><p>Indoors at ${where} (dome or closed roof): weather is neutral for this game.</p></div>`;
     const roofNote = w.roof === "retractable" ? ` ${where} has a retractable roof; it may be closed if the weather is bad.` : "";
+    const started = w.kickoff_et && new Date(w.kickoff_et.replace(" ", "T") + ":00-05:00") <= new Date();
+    if (w.temp_f == null && started) return `<div class="box"><h2>Game-day weather</h2><p class="muted">No pre-kickoff forecast was kept for ${where}.${roofNote}</p></div>`;
     if (w.temp_f == null) return `<div class="box"><h2>Game-day weather</h2><p class="muted">No forecast yet for ${where}. It appears within 7 days of kickoff and is refreshed the morning of the game.${roofNote}</p></div>`;
     const flags = [w.windy && "Windy", w.cold && "Cold", w.wet && "Rain/snow likely"].filter(Boolean);
     const ctx = [];
@@ -492,7 +494,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
       </div>
       ${flags.length ? `<div class="wx-flags">${flags.map(f => `<span class="pill questionable">${esc(f)}</span>`).join("")}</div>` : ""}
       ${ctx.map(t => `<p class="muted" style="margin:8px 0 0">${esc(t)}</p>`).join("")}
-      <p class="muted" style="margin:8px 0 0;font-size:12px">Forecast for kickoff and the two hours after, at ${where}, from Open-Meteo, fetched ${esc(w.fetched_at || "")}.${roofNote} Shown next to the total; it is not part of the model's win %.</p></div>`;
+      <p class="muted" style="margin:8px 0 0;font-size:12px">Forecast for kickoff and the two hours after, at ${where}, from Open-Meteo, fetched ${esc(w.fetched_at || "")}${started ? ": the last forecast before kickoff, kept once the game started" : ""}.${roofNote} Shown next to the total; it is not part of the model's win %.</p></div>`;
   }
 
   // ---- Predictions tab ------------------------------------------------------
