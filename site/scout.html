@@ -69,6 +69,8 @@ header.top { padding-block: 22px 8px; display: grid; gap: 4px; }
 .notes p.draft { font-size: 12px; color: var(--warn); font-weight: 600; }
 .notes ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .notes .note-tabs { margin: 2px 0 10px; }
+.notes .calls { border: 1px solid var(--accent); border-radius: 8px; padding: 2px 14px 12px; margin: 0 0 12px; }
+.notes .calls .note-h:first-child { margin-top: 10px; }
 .notes .note-tabs button { padding: 7px 18px; font-weight: 600; }
 .notes .note-panel { border: 1px solid var(--rule); border-radius: 8px; padding: 4px 14px 12px; background: var(--paper); }
 .notes .note-panel > .note-h:first-child { margin-top: 10px; }
@@ -358,20 +360,28 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
   // offense half (attacking their defense) by their "## " headings, so the box
   // shows one at a time behind a Defense / Offense toggle.
   function scoutingNotesHtml(text) {
-    const parts = { pre: [], defense: [], offense: [] };
-    let cur = "pre";
+    const parts = { pre: [], defense: [], offense: [] }, calls = [];
+    let cur = "pre", inCalls = false;
     for (const ln of text.split(/\r?\n/)) {
       const t = ln.trim();
-      if (/^## /.test(t)) cur = /attacking|on offense|our offense/i.test(t) ? "offense" : "defense";
-      parts[cur].push(ln);
+      if (/^## /.test(t)) {
+        cur = /attacking|on offense|our offense/i.test(t) ? "offense" : "defense";
+        inCalls = /look for|to watch|keys/i.test(t);
+        if (inCalls) { calls.push(t); continue; }
+      }
+      (inCalls ? calls : parts[cur]).push(ln);
     }
+    // The "What to look for" calls lead the box, both sides at once, instead of
+    // sitting at the bottom of each half.
+    const callsHtml = calls.some(l => /^[-*] /.test(l.trim()))
+      ? `<div class="calls"><h2 style="margin:10px 0 0">Scouting calls</h2>${notesHtml(calls.join("\n"))}</div>` : "";
     const sides = ["defense", "offense"].filter(k => parts[k].some(l => l.trim()));
     if (!sides.includes(state.noteSide)) state.noteSide = sides[0] || "defense";
     const label = { defense: "Defense", offense: "Offense" };
     const tabs = sides.length > 1
       ? `<div class="seg note-tabs" role="group" aria-label="Notes side">${sides.map(k =>
           `<button type="button" data-note-side="${k}" aria-pressed="${k === state.noteSide}">${label[k]}</button>`).join("")}</div>` : "";
-    return notesHtml(parts.pre.join("\n")) + tabs + sides.map(k =>
+    return notesHtml(parts.pre.join("\n")) + callsHtml + tabs + sides.map(k =>
       `<div class="note-panel" data-note-panel="${k}"${k === state.noteSide ? "" : " hidden"}>${notesHtml(parts[k].join("\n"))}</div>`).join("");
   }
 
@@ -554,6 +564,8 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
         </div>
         <div class="box"><h2>Win chance</h2>
           <div class="wp">
+            ${w2 == null ? "" : `<div><div class="lab"><span><span class="est">Model estimate</span> · W2 (newest model)</span></div>
+              <div class="lab"><span>${esc(team)} <b>${pct(w2)}</b></span><span>${esc(opp.team)} <b>${pct(1 - w2)}</b></span></div>${bar(w2, info.color, opp.color)}</div>`}
             <div><div class="lab"><span><span class="est">Model estimate</span> · ${esc(ln.model_version)}</span></div>
               <div class="lab"><span>${esc(team)} <b>${pct(model)}</b></span><span>${esc(opp.team)} <b>${pct(1 - model)}</b></span></div>${bar(model, info.color, opp.color)}</div>
             ${market == null ? "" : `<div><div class="lab"><span>Market (moneylines, margin removed)</span></div>
@@ -616,7 +628,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
       .sort((a, b) => a.line - b.line).slice(0, 3);
     const cols = [info, opp].map(t => {
       const items = watch(t);
-      return `<div><h3 style="margin:8px 0 4px;font-size:14px">${esc(t.nick)} offense</h3>${items.length
+      return `<div><h3 style="margin:8px 0 4px;font-size:14px">Scouting calls: ${esc(t.nick)} offense</h3>${items.length
         ? `<ul style="margin:0;padding-left:18px">${items.map(r => `<li>${esc(r.text)}</li>`).join("")}</ul>`
         : `<p class="muted" style="margin:0">Nothing flagged this week.</p>`}</div>`;
     }).join("");
