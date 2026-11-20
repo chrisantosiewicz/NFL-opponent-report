@@ -114,7 +114,7 @@ slugs <- character()
 for (i in seq_len(nrow(games))) {
   message(sprintf("Scouting %s for %s, %d week %d (%s)", games$opponent[i], games$team[i],
                   games$season[i], games$week[i], format(games$gameday[i])))
-  slugs <- c(slugs, render_report(games[i, ], db_path))
+  slugs <- c(slugs, render_report(games[i, ], db_path, force = !is.null(opponent)))
 }
 if (!is.null(league_games)) render_league_reports(league_games, db_path, skip = games)
 # Feature the report rendered first: the focal team's game, or the earliest

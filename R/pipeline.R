@@ -594,15 +594,33 @@ warn_run <- function(text, title = "Trade check") {
   if (identical(Sys.getenv("GITHUB_ACTIONS"), "true")) cat("::warning title=", title, "::", text, "\n", sep = "")
 }
 
+# TRUE once the game's kickoff (schedule time, US Eastern) has passed.
+game_started <- function(game_id, db_path = "data/nfl.duckdb") {
+  if (is.null(game_id) || is.na(game_id)) return(FALSE)
+  con <- DBI::dbConnect(duckdb::duckdb(), db_path, read_only = TRUE)
+  on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
+  k <- DBI::dbGetQuery(con, "SELECT CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5) AS kickoff
+                             FROM raw_schedules WHERE game_id = ? AND gametime IS NOT NULL", params = list(game_id))
+  if (nrow(k) == 0) return(FALSE)
+  at <- as.POSIXct(k$kickoff[1], format = "%Y-%m-%d %H:%M", tz = "America/New_York")
+  !is.na(at) && at <= Sys.time()
+}
+
 report_slug <- function(season, week, opponent) {
   sprintf("%d-week%02d-%s", as.integer(season), as.integer(week), opponent)
 }
 
 # Render the one-pager for one opponent. Writes site/reports/<slug>.html (and
 # .pdf when Chrome is available) and returns the slug.
-render_report <- function(game, db_path = "data/nfl.duckdb", out_dir = "site/reports") {
+render_report <- function(game, db_path = "data/nfl.duckdb", out_dir = "site/reports", force = FALSE) {
   slug <- report_slug(game$season, game$week, game$opponent)
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+  # Report freeze: once the game kicks off, the one-pager stays as the last
+  # render before kickoff (like the live page). A manual --opponent run forces it.
+  if (!force && file.exists(file.path(out_dir, paste0(slug, ".html"))) && game_started(game$game_id, db_path)) {
+    message("kept ", slug, ": the game has started")
+    return(slug)
+  }
 
   args <- c(
     "render", "opponent_report.qmd",
