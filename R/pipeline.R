@@ -379,12 +379,46 @@ export_site_data <- function(con, season, week, focal_team, site_dir = "site") {
   data_dir <- file.path(site_dir, "data")
   dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
   path <- file.path(normalizePath(data_dir), sprintf("%d-week%02d.json", as.integer(season), as.integer(week)))
+  before <- if (file.exists(path)) jsonlite::fromJSON(path, simplifyVector = FALSE) else NULL
   run_sql_template(con, "sql/export/site_week.sql",
                    season = as.integer(season), week = as.integer(week),
                    focal_team = focal_team, path = path, updated = updated_stamp())
+  freeze_started_games(con, season, week, path, before)
   run_sql_template(con, "sql/export/site_index.sql", dir = normalizePath(data_dir))
   message("exported ", path)
   invisible(path)
+}
+
+# Game freeze: once a game kicks off, its two teams' rows on the week page
+# stay as the last run before kickoff wrote them (scouting numbers, notes,
+# lines, injuries, trends), so a run after the game can't rewrite what the
+# page said going in. Team list, schedule, weather history and weather (kept
+# by lock_weather()) are not frozen.
+FREEZE_SKIP <- c("teams", "games", "weather_history", "weather")
+freeze_started_games <- function(con, season, week, path, before) {
+  if (is.null(before)) return(invisible())
+  kick <- dbGetQuery(con, "
+    SELECT game_id, home_team, away_team,
+           CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5) AS kickoff
+    FROM raw_schedules WHERE CAST(season AS INTEGER) = ? AND CAST(week AS INTEGER) = ? AND gametime IS NOT NULL",
+    params = list(as.integer(season), as.integer(week)))
+  at <- as.POSIXct(kick$kickoff, format = "%Y-%m-%d %H:%M", tz = "America/New_York")
+  kick <- kick[!is.na(at) & at <= Sys.time(), ]
+  if (nrow(kick) == 0) return(invisible())
+  teams <- c(kick$home_team, kick$away_team)
+  hit <- function(r) isTRUE(r$team %in% teams) || isTRUE(r$game_id %in% kick$game_id) ||
+    isTRUE(r$home_team %in% teams) || isTRUE(r$away_team %in% teams)
+  after <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+  for (k in setdiff(names(after), FREEZE_SKIP)) {
+    new <- after[[k]]; old <- before[[k]]
+    if (!is.list(new) || !is.list(old) || !length(old) || !is.list(old[[1]])) next
+    keep_new <- Filter(function(r) !(is.list(r) && hit(r)), new)
+    keep_old <- Filter(function(r) is.list(r) && hit(r), old)
+    after[[k]] <- c(keep_new, keep_old)
+  }
+  writeLines(jsonlite::toJSON(after, auto_unbox = TRUE, null = "null", na = "null", digits = NA), path)
+  message("froze ", length(unique(teams)), " teams whose games have started")
+  invisible()
 }
 
 # Writes site/data/predictions-<season>.json: the model's win % for every game,
