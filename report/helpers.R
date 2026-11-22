@@ -154,7 +154,8 @@ trades_panel <- function(moves, opp, focal, feed, gameday) {
                       ifelse(is.na(moves$position), "", paste0(moves$position, " ")),
                       moves$player_name),
       Move = paste0(ifelse(joined, paste("from", moves$from_team), paste("to", moves$to_team)),
-                    ifelse(moves$move_type == "trade", "", " (roster)")),
+                    ifelse(moves$move_type == "trade", "",
+                           ifelse(moves$move_type == "waivers/FA", " (waivers/FA)", " (roster)"))),
       `Before the move` = vapply(seq_len(nrow(moves)), function(i) usage_phrase(moves[i, ]), ""),
       `Games since` = sprintf("%d of %d", as.integer(since), as.integer(played)),
       check.names = FALSE)
