@@ -1,0 +1,11 @@
+# The NFL trade deadline for each season (date, ET). Trades can only happen
+# on or before it, so after it every team switch in the weekly rosters is a
+# waiver claim, a cut or a free-agent signing, never a trade.
+# Add next season's row before Week 1: the run stops without it
+# (sql/tests/test_trade_deadline_known.sql).
+season,deadline
+2022,2022-11-01
+2023,2023-10-31
+2024,2024-11-05
+2025,2025-11-04
+2026,2026-11-10

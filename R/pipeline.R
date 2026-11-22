@@ -117,13 +117,17 @@ load_side_feed <- function(con, table, columns, fetch) {
   data.frame(feed = table, ok = ok, rows = nrow(df), loaded_at = Sys.time())
 }
 
-# Trades nflverse hasn't published yet, typed in by hand (config/trades_manual.csv).
+# Trades nflverse hasn't published yet, typed in by hand (config/trades_manual.csv),
+# and each season's trade deadline (config/trade_deadlines.csv).
 # Loaded on every run, including --skip-load, because the file lives in the repo.
 # Once nflverse has a trade, its manual row is ignored (see 06_stg_trades.sql).
 load_manual_trades <- function(con, path = "config/trades_manual.csv") {
   manual <- read.csv(path, colClasses = "character", na.strings = "", comment.char = "#")
   dbWriteTable(con, "raw_trades_manual", manual, overwrite = TRUE)
   message("raw_trades_manual: ", nrow(manual), " rows")
+  deadlines <- read.csv("config/trade_deadlines.csv", colClasses = "character", comment.char = "#")
+  dbWriteTable(con, "raw_trade_deadlines", deadlines, overwrite = TRUE)
+  message("raw_trade_deadlines: ", nrow(deadlines), " seasons")
   invisible(manual)
 }
 
@@ -551,7 +555,9 @@ check_trades <- function(con, game) {
 # report's game; this lists every team switch in the weekly rosters, for all
 # 32 teams, that no trade list explains yet, first seen in the last `days`
 # days. Each one is either a trade to add to config/trades_manual.csv or a
-# waiver claim/signing to leave alone. A move drops off this list once its
+# waiver claim/signing to leave alone. Only moves on or before the season's
+# trade deadline are listed: after it, stg_trades calls every switch
+# 'waivers/FA', so the list empties and the issue closes itself. A move drops off this list once its
 # trade is in the CSV (stg_trades keeps the listed trade instead).
 # Writes the list to `out` (Markdown) for the workflow's "Trades to confirm"
 # issue, and to the run's summary page on GitHub Actions.
@@ -559,13 +565,14 @@ check_league_moves <- function(con, run_date, days = 14, out = "data/roster-move
   moves <- dbGetQuery(con, "
     SELECT trade_date, from_team, to_team, player_name, position
     FROM stg_trades
-    WHERE source = 'roster'
+    WHERE move_type = 'roster move'   -- after the deadline it's 'waivers/FA', never a trade
       AND trade_date >= ?
     ORDER BY trade_date, to_team, player_name",
     params = list(as.Date(run_date) - days))
   dir.create(dirname(out), showWarnings = FALSE, recursive = TRUE)
   if (nrow(moves) == 0) {
-    message("League roster check: every team switch in the last ", days, " days is on a trade list")
+    message("League roster check: no possible trades to confirm (every team switch in the last ", days,
+            " days is on a trade list or came after the trade deadline)")
     writeLines(character(), out)
     return(invisible(moves))
   }

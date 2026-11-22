@@ -17,6 +17,11 @@
 --                        Its date is the day after the old team's last game
 --                        with him, since rosters don't say when he moved.
 --
+-- Trade deadline (config/trade_deadlines.csv): after it there are no trades.
+-- A roster switch after the deadline is move_type 'waivers/FA' (a waiver
+-- claim, cut or free-agent signing); on or before it, 'roster move' (maybe a
+-- trade nobody typed in). Feed and manual trades dated after it are dropped.
+--
 -- Player matching: the feed and rosters carry a PFR id. A manual row without
 -- one is matched by name to that season's rosters and snap counts. The PFR id
 -- then finds the gsis id (raw_players) used in play-by-play.
@@ -193,7 +198,9 @@ SELECT
     COALESCE(p.position, m.position) AS position,
     COALESCE(m.pfr_id_matched, pg.pfr_id) AS pfr_id,
     COALESCE(m.gsis_id_matched, p.gsis_id) AS gsis_id,
-    CASE WHEN m.source = 'roster' THEN 'roster move' ELSE 'trade' END AS move_type,
+    CASE WHEN m.source <> 'roster' THEN 'trade'
+         WHEN m.trade_date > d.deadline THEN 'waivers/FA'
+         ELSE 'roster move' END AS move_type,
     m.notes,
     m.source
 FROM matched m
@@ -203,10 +210,16 @@ LEFT JOIN (
     FROM raw_players
     WHERE NULLIF(pfr_id, '') IS NOT NULL
 ) p ON p.pfr_id = m.pfr_id_matched AND p.r = 1
+LEFT JOIN (SELECT CAST(season AS INTEGER) AS season, CAST(deadline AS DATE) AS deadline
+           FROM raw_trade_deadlines) d ON d.season = m.season
 LEFT JOIN (
     -- a roster row can have a gsis id but no PFR id
     SELECT gsis_id, MAX(NULLIF(pfr_id, '')) AS pfr_id
     FROM raw_players
     GROUP BY gsis_id
 ) pg ON pg.gsis_id = m.gsis_id_matched
-WHERE m.dup = 1;
+WHERE m.dup = 1
+  -- No trades after the deadline: a feed or hand-typed trade dated later
+  -- belongs to the offseason (or is a typo, which test_no_trades_after_deadline
+  -- catches in the CSV), so it is not an in-season move.
+  AND NOT (m.source <> 'roster' AND m.trade_date > COALESCE(d.deadline, DATE '9999-12-31'));
