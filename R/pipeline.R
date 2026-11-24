@@ -150,6 +150,13 @@ load_w2_predictions <- function(con, path = "config/w2_predictions.csv") {
                                 "numeric", "numeric", "numeric", "character", "character"))
   dbWriteTable(con, "raw_w2_predictions", w2, overwrite = TRUE)
   message("raw_w2_predictions: ", nrow(w2), " games")
+  # Backfill (config/w2_backfill.csv): W2 run after the fact for weeks with no
+  # live run, for the backfilled star-pick record only.
+  bf <- read.csv("config/w2_backfill.csv", na.strings = "", comment.char = "#",
+                 colClasses = c("integer", "integer", "character", "character", "character",
+                                "numeric", "numeric", "numeric", "character", "character"))
+  dbWriteTable(con, "raw_w2_backfill", bf, overwrite = TRUE)
+  message("raw_w2_backfill: ", nrow(bf), " games")
   invisible(w2)
 }
 

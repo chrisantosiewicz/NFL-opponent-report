@@ -73,7 +73,7 @@ COPY (
                       w2_run_at: w.w2_run_at}
                      ORDER BY p.gameday, p.game_id)
          FROM game_predictions p
-         LEFT JOIN w2_predictions w USING (game_id)
+         LEFT JOIN (SELECT * FROM w2_predictions WHERE NOT is_backfill) w USING (game_id)
          WHERE p.season = {{season}} AND p.week = {{week}})   AS lines,
 
         -- W2's side (unrated lean) and total (1-5 stars) for each game (39_pick_stars.sql).
@@ -84,7 +84,7 @@ COPY (
                       points: points, stars: stars, reasons: reasons}
                      ORDER BY stars DESC NULLS LAST, gap DESC, game_id, market)
          FROM pick_stars
-         WHERE season = {{season}} AND week = {{week}})   AS picks,
+         WHERE season = {{season}} AND week = {{week}} AND NOT is_backfill)   AS picks,
 
         -- 1-5 star score on each player prop line pulled this week (40_prop_stars.sql).
         (SELECT list({game_id: game_id, team: team, player: player, position: position,

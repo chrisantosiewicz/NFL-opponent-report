@@ -606,6 +606,22 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
   // ---- Star picks: 1-5 stars on W2's side and total and on prop lines (39/40 models).
   const starTxt = n => `<span class="stars" aria-label="${n} of 5 stars">${"★".repeat(n)}<span class="off">${"★".repeat(5 - n)}</span></span>`;
   const pickRow = (label, n, reasons) => `<div class="pick"><div><b>${esc(label)}</b><div class="why">${(reasons || []).map(esc).join(" · ")}</div></div>${n ? starTxt(n) : `<span class="est" title="No spread edge in W2's 2019-2024 backtest; graded so it can earn stars">Unrated lean</span>`}</div>`;
+  function tallyTable(tally, note) {
+    const rows = [5, 4, 3, 2, 1, "spread"].filter(n => tally[n]);
+    return `<table class="starrec" style="margin-top:10px"><thead><tr><th>Stars</th><th>Record</th><th>Win %</th></tr></thead><tbody>${rows.map(n => { const t = tally[n], dec = t.W + t.L;
+      return `<tr><td>${n === "spread" ? "Spread leans (unrated)" : starTxt(n)}</td><td>${t.W}-${t.L}${t.P ? "-" + t.P : ""}</td><td>${dec ? Math.round(100 * t.W / dec) + "%" : "–"}</td></tr>`; }).join("")}</tbody></table>
+      <p class="muted" style="margin:6px 0 0">${note}</p>`;
+  }
+  function backfillRecord(preds) {
+    const b = (preds && preds.backfill) || [];
+    if (!b.length) return "";
+    const tally = {};
+    for (const r of b) { const k = r.market === "spread" ? "spread" : r.stars; if (!k || !r.result) continue;
+      const t = tally[k] || (tally[k] = { W: 0, L: 0, P: 0 }); t[r.result]++; }
+    const weeks = [...new Set(b.map(r => r.week))].sort((x, y) => x - y);
+    return `<h2 style="margin-top:16px">Backfilled, weeks ${weeks[0]}${weeks.length > 1 ? "-" + weeks[weeks.length - 1] : ""}</h2>` +
+      tallyTable(tally, "Stars worked out after the games from W2's numbers (run after the fact for weeks before W2 went live), graded against closing lines. A check on the method, not picks anyone could have made.");
+  }
   function starRecord(preds) {
     if (!preds || !preds.games) return "";
     const tally = {};
@@ -614,10 +630,8 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
       const t = tally[n] || (tally[n] = { W: 0, L: 0, P: 0 }); t[res]++;
     }
     const rows = [5, 4, 3, 2, 1, "spread"].filter(n => tally[n]);
-    if (!rows.length) return `<p class="muted" style="margin:10px 0 0">No graded star picks yet. Each pick is kept as it stood at kickoff and graded against that line, so the record by star level builds week by week.</p>`;
-    return `<table class="starrec" style="margin-top:10px"><thead><tr><th>Stars</th><th>Record</th><th>Win %</th></tr></thead><tbody>${rows.map(n => { const t = tally[n], dec = t.W + t.L;
-      return `<tr><td>${n === "spread" ? "Spread leans (unrated)" : starTxt(n)}</td><td>${t.W}-${t.L}${t.P ? "-" + t.P : ""}</td><td>${dec ? Math.round(100 * t.W / dec) + "%" : "–"}</td></tr>`; }).join("")}</tbody></table>
-      <p class="muted" style="margin:6px 0 0">Totals by star level and W2's spread leans, graded against the line at kickoff. 52.4% is break-even at −110.</p>`;
+    if (!rows.length) return `<p class="muted" style="margin:10px 0 0">No graded star picks locked before kickoff yet. Each pick is kept as it stood at kickoff and graded against that line, so this record builds week by week.</p>${backfillRecord(preds)}`;
+    return tallyTable(tally, "Locked before kickoff: totals by star level and W2's spread leans, graded against the line at kickoff. 52.4% is break-even at −110.") + backfillRecord(preds);
   }
   function starsHtml(d, team, info, game, preds) {
     if (!d.picks && !d.prop_picks) return "";

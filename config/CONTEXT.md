@@ -8,6 +8,7 @@ One job: hold what nflverse doesn't publish (yet). Each CSV explains its columns
 | `trade_deadlines.csv` | before Week 1 each season (one row: season, deadline) | `load_manual_trades()` -> `sql/models/06_stg_trades.sql` |
 | `stadiums.csv` | the schedule names a stadium not in it (a "No stadium location" warning) | `load_stadiums()`, `fetch_weather()` -> `sql/models/36_game_weather.sql` |
 | `w2_predictions.csv` | written and pushed by the laptop's scheduled `_tools/w2_refresh.ps1` (by hand: `python3 -I _tools/w2_to_csv.py <w2 json>`, then commit); never typed by hand; a push starts an update run | `load_w2_predictions()` -> `sql/models/38_w2_predictions.sql` |
+| `w2_backfill.csv` | written on the laptop (`python3 -I _tools/w2_to_csv.py --backfill <w2 json>`) for weeks W2 never ran live; never typed by hand | `load_w2_predictions()` -> `sql/models/38_w2_predictions.sql` (backfilled star record only) |
 | `prop_lines.csv` | written by `_tools/props_to_csv.py` on the laptop (player prop lines from The Odds API, median line only); never typed by hand | `load_prop_lines()` -> `sql/models/40_prop_stars.sql` |
 | `coaching_changes_manual.csv` | offseason HC/OC/DC changes, before Week 1 | `sql/models/27_week1_carryover.sql` |
 

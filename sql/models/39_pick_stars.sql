@@ -16,7 +16,9 @@
 --   risk    -1..0  an outdoor game with no forecast yet, or an over in wind
 --                  or rain. Floor 0 points (1 star).
 -- Spread reasons still name the gap and a starting QB out on the picked side
--- (picked sides with their QB out covered 40.4%, 2024-2026).
+-- (picked sides with their QB out covered 40.4%, 2024-2026). is_backfill: W2
+-- was run after the fact (config/w2_backfill.csv); such rows feed only the
+-- backfilled record in predictions-<season>.json.
 
 CREATE OR REPLACE TABLE pick_stars AS
 WITH g AS (
@@ -24,7 +26,7 @@ WITH g AS (
            p.home_line, p.total_line,
            w.w2_home_margin + p.home_line AS home_gap,   -- W2 margin minus the market's (home side)
            w.w2_total - p.total_line      AS total_gap,
-           w.w2_home_margin, w.w2_total
+           w.w2_home_margin, w.w2_total, w.is_backfill
     FROM game_predictions p
     JOIN w2_predictions w USING (game_id)
     WHERE p.home_line IS NOT NULL AND p.total_line IS NOT NULL
@@ -35,12 +37,12 @@ picks AS (
            CASE WHEN home_gap >= 0 THEN home_team ELSE away_team END AS pick_team,
            NULL::VARCHAR AS pick_total,
            CASE WHEN home_gap >= 0 THEN home_line ELSE -home_line END AS pick_line,
-           abs(home_gap) AS gap, w2_home_margin, w2_total
+           abs(home_gap) AS gap, w2_home_margin, w2_total, is_backfill
     FROM g
     UNION ALL
     SELECT season, week, gameday, game_id, home_team, away_team, 'total',
            NULL, CASE WHEN total_gap >= 0 THEN 'over' ELSE 'under' END,
-           total_line, abs(total_gap), w2_home_margin, w2_total
+           total_line, abs(total_gap), w2_home_margin, w2_total, is_backfill
     FROM g
 ),
 
@@ -72,7 +74,7 @@ scored AS (
 )
 
 SELECT
-    season, week, gameday, game_id, home_team, away_team, market,
+    season, week, gameday, game_id, home_team, away_team, market, is_backfill,
     pick_team, pick_total, pick_line,
     CASE WHEN market = 'spread'
          THEN pick_team || ' ' || CASE WHEN pick_line > 0 THEN '+' ELSE '' END

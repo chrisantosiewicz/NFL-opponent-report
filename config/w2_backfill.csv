@@ -1,0 +1,6 @@
+# W2 backfill: W2 run after the fact for 2026 weeks that had no live W2 run (weeks
+# 1-10), as-of each week (only games before it), on the laptop with the same fit as
+# the live runs. Same columns as w2_predictions.csv. Used only for the backfilled
+# star-pick record (graded against closing lines); never shown as a live call and
+# never locked. A game in w2_predictions.csv wins over a row here.
+season,week,game_id,home_team,away_team,w2_home_win,w2_home_margin,w2_total,fit_run_id,run_at

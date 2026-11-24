@@ -38,7 +38,7 @@ COPY (
         FROM w2_predictions w
         LEFT JOIN pick_stars ps ON ps.game_id = w.game_id AND ps.market = 'spread'
         LEFT JOIN pick_stars pt ON pt.game_id = w.game_id AND pt.market = 'total'
-        WHERE w.season = {{season}} AND w.week = {{week}}
+        WHERE w.season = {{season}} AND w.week = {{week}} AND NOT w.is_backfill
           AND w.gameday >= DATE '{{run_date}}'
           AND w.game_id NOT IN (
               SELECT game_id FROM raw_schedules
@@ -105,5 +105,25 @@ COPY (
         '{{updated}}'                            AS updated,
         (SELECT model_version FROM elo_params)   AS model_version,
         'K 20, home field 32, +25 off a bye, one-third regression each season, ratings from 2017 (includes 2025). Rest adjustment not yet included.' AS model_settings,
-        (SELECT list(g ORDER BY g.week DESC, g.gameday, g.game_id) FROM graded g) AS games
+        (SELECT list(g ORDER BY g.week DESC, g.gameday, g.game_id) FROM graded g) AS games,
+        -- Backfilled star picks: finished games with W2 numbers but no star
+        -- pick locked before kickoff (week 11, before stars existed, and the
+        -- weeks W2 was run for after the fact, config/w2_backfill.csv). Worked
+        -- out fresh each run from 39_pick_stars.sql and graded against the
+        -- closing line; shown apart from the locked record.
+        (SELECT list({week: b.week, game_id: b.game_id, market: b.market, pick_label: b.pick_label,
+                      stars: b.stars, gap: b.gap, w2_run: CASE WHEN b.is_backfill THEN 'after the fact' ELSE 'live' END,
+                      result: CASE
+                          WHEN b.market = 'spread' THEN CASE
+                              WHEN (CASE WHEN b.pick_team = m.home_team THEN m.result ELSE -m.result END) + b.pick_line > 0 THEN 'W'
+                              WHEN (CASE WHEN b.pick_team = m.home_team THEN m.result ELSE -m.result END) + b.pick_line < 0 THEN 'L'
+                              ELSE 'P' END
+                          WHEN m.total_points = b.pick_line THEN 'P'
+                          WHEN (m.total_points > b.pick_line) = (b.pick_total = 'over') THEN 'W'
+                          ELSE 'L' END}
+                     ORDER BY b.week DESC, b.game_id, b.market)
+         FROM pick_stars b
+         JOIN stg_market_lines m USING (game_id)
+         WHERE b.season = {{season}} AND m.is_complete
+           AND b.game_id NOT IN (SELECT game_id FROM graded WHERE w2_spread_pick IS NOT NULL)) AS backfill
 ) TO '{{path}}' (FORMAT JSON);
