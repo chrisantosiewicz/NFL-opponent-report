@@ -7,8 +7,17 @@ repo's root:
 
     uv run --project C:/Betting_Algorithm python _tools/props_to_csv.py --season 2026 --week 12
 
+Run twice a week by _tools/w2_refresh.ps1: Thursday morning with --through-friday
+(Thursday and Friday games) and Saturday morning (every game left that week).
+
+Markets: receptions, receiving yards, rushing yards and passing yards, the four
+the site projects from player_trends. Not pulled, since the site has no
+projection to compare them with or they repeat these: TD scorers, passing TDs,
+attempts and completions, interceptions, longest plays, kicking and defense.
+Each extra market adds about 1 credit per game.
+
 Each game costs about one credit per market that has lines (4 markets, one
-bookmaker group): roughly 50-65 credits for a full week. The run stops before
+bookmaker group): about 16 credits on a Thursday, 40-50 on a Saturday. The run stops before
 spending past --max-credits or past the betting repo's budget rules (cycle cap,
 reserve floor). Raw responses are kept in the betting repo's data folder
 (odds/props/, gitignored); only the median line per player and market is written
@@ -25,6 +34,7 @@ import statistics
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 CSV = Path(__file__).resolve().parent.parent / "config" / "prop_lines.csv"
 COLUMNS = ["season", "week", "game_id", "player", "market", "line", "books", "fetched_at"]
@@ -37,6 +47,7 @@ MARKETS = {  # Odds API market key -> our name
 }
 CREDITS_PER_GAME = len(MARKETS)  # upper bound: one per market returned, one bookmaker group
 LEDGER_PRIORITY = "nfl_props"
+ET = ZoneInfo("America/New_York")
 # The Tuesday of week 1 (weeks turn over on Tuesdays), as in w2_refresh.ps1.
 WEEK1_TUESDAY = {2026: datetime(2026, 9, 8, tzinfo=UTC)}
 
@@ -61,6 +72,12 @@ def game_id(season, week, event):
     if not away or not home:
         raise ValueError(f"unknown team in {event['away_team']} @ {event['home_team']}")
     return f"{season}_{week:02d}_{away}_{home}"
+
+
+def before_saturday(event):
+    """True for a game that kicks off Thursday or Friday, Eastern time."""
+    t = datetime.fromisoformat(event["commence_time"].replace("Z", "+00:00"))
+    return t.astimezone(ET).weekday() in (3, 4)
 
 
 def week_window(season, week):
@@ -121,7 +138,7 @@ def from_dir(season, week, folder):
     return out
 
 
-def pull(season, week, max_credits):
+def pull(season, week, max_credits, through_friday=False):
     # The betting repo's own modules: settings (.env), client, ledger and spend rules.
     from betting.config import load_settings
     from betting.odds.books import REQUESTED_BOOKS
@@ -138,7 +155,9 @@ def pull(season, week, max_credits):
     now = client.now()
     start, end = week_window(season, week)
     events = client.get_events(SPORT, start=max(start, now), end=end).json()  # free
-    print(f"{len(events)} games left in {season} week {week}")
+    if through_friday:
+        events = [e for e in events if before_saturday(e)]
+    print(f"{len(events)} games left in {season} week {week}" + (" (Thu/Fri only)" if through_friday else ""))
     spent, out = 0, []
     for ev in sorted(events, key=lambda e: e["commence_time"]):
         if spent + CREDITS_PER_GAME > max_credits:
@@ -180,10 +199,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--season", type=int, required=True)
     ap.add_argument("--week", type=int, required=True)
-    ap.add_argument("--max-credits", type=int, default=70)
+    ap.add_argument("--max-credits", type=int, default=60)
+    ap.add_argument("--through-friday", action="store_true",
+                    help="only games kicking off Thursday or Friday (ET): the Thursday-morning pull")
     ap.add_argument("--from-dir", help="saved event-odds JSON files; no API call")
     a = ap.parse_args()
-    rows = from_dir(a.season, a.week, a.from_dir) if a.from_dir else pull(a.season, a.week, a.max_credits)
+    rows = from_dir(a.season, a.week, a.from_dir) if a.from_dir else pull(a.season, a.week, a.max_credits, a.through_friday)
     if not rows:
         sys.exit("no prop lines pulled; config/prop_lines.csv left as is")
     write_csv(rows)

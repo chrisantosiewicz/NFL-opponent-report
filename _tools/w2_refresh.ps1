@@ -4,7 +4,10 @@
 #      rebuilds W2's features (`betting predict build-features`), then runs W2
 #      for this NFL week (`betting predict week`). Predict only: never refits.
 #   2. copies the newest run into config/w2_predictions.csv (_tools/w2_to_csv.py),
-#   3. commits and pushes the CSV to main. That push starts an update run of the
+#   3. on Thursday and Saturday mornings, pulls NFL prop lines into
+#      config/prop_lines.csv (_tools/props_to_csv.py, the betting repo's Odds API
+#      key and budget): Thursday for the Thu/Fri games, Saturday for the rest,
+#   4. commits and pushes the CSVs to main. That push starts an update run of the
 #      site (.github/workflows/weekly-report.yml), so the page shows the new
 #      numbers a few minutes later. W2's last run before each kickoff is the one
 #      graded.
@@ -22,7 +25,10 @@ param(
     # Override the betting repo's data refresh with another command (run from
     # $BettingDir). Blank = the default below.
     [string]$DataRefresh = "",
-    [switch]$SkipDataRefresh
+    [switch]$SkipDataRefresh,
+    # Prop lines: auto = Thursday (Thu/Fri games) and Saturday (the rest).
+    [ValidateSet("auto", "always", "never")] [string]$Props = "auto",
+    [int]$PropCredits = 60
 )
 
 # The betting repo's weekly data refresh (from its "Add predictions" thread,
@@ -74,9 +80,19 @@ try {
         python -I _tools/w2_to_csv.py $json.FullName
         if ($LASTEXITCODE -ne 0) { throw "w2_to_csv.py exited $LASTEXITCODE" }
         git add config/w2_predictions.csv
+        $msg = "W2: $Season week $Week ($($json.BaseName))"
+        $day = (Get-Date).DayOfWeek
+        if ($Props -eq "always" -or ($Props -eq "auto" -and ($day -eq "Thursday" -or $day -eq "Saturday"))) {
+            $propArgs = @("--season", $Season, "--week", $Week, "--max-credits", $PropCredits)
+            if ($day -eq "Thursday") { $propArgs += "--through-friday" }
+            Log "Prop lines: $($propArgs -join ' ')"
+            uv run --project $BettingDir python -I _tools/props_to_csv.py @propArgs
+            if ($LASTEXITCODE -eq 0) { git add config/prop_lines.csv; $msg += " + prop lines" }
+            else { Log "Prop pull exited $LASTEXITCODE; pushing W2 without new prop lines." }
+        }
         git diff --cached --quiet
-        if ($LASTEXITCODE -eq 0) { Log "No change in W2's numbers; nothing to push."; exit 0 }
-        git commit --quiet -m "W2: $Season week $Week ($($json.BaseName))"
+        if ($LASTEXITCODE -eq 0) { Log "No change in W2's numbers or prop lines; nothing to push."; exit 0 }
+        git commit --quiet -m $msg
         git push --quiet origin HEAD:main
         if ($LASTEXITCODE -ne 0) { throw "git push failed" }
         Log "Pushed; the site's update run starts now."
