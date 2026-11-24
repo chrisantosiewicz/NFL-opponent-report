@@ -4,9 +4,10 @@
 -- the as-of draft notes: the hot spot's area is named in that week's notes).
 SELECT season, week, team, CAST(call_no AS VARCHAR) AS what, 'bad verdict' AS problem
 FROM report_card
-WHERE verdict NOT IN ('Hit', 'Miss', 'Mixed', 'Called it', 'Held', 'Didn''t come up')
+WHERE verdict NOT IN ('Hit', 'Miss', 'Mixed', 'Called it', 'Held', 'Didn''t come up', 'No real impact')
    OR (kind = 'tendency' AND verdict IN ('Held', 'Called it'))
    OR (side = 'offense' AND verdict IN ('Held', 'Called it'))
+   OR (verdict = 'No real impact' AND call_no NOT IN (10, 11, 12, 14))   -- net-points calls only
 UNION ALL
 SELECT season, week, team, CAST(call_no AS VARCHAR), 'duplicate call'
 FROM report_card GROUP BY ALL HAVING COUNT(*) > 1

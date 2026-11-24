@@ -231,11 +231,14 @@ shifts AS (   -- the one-pager's six watched numbers, flagged the same way
 ),
 
 dfn AS (   -- their defense, season to date (rank 1 = allows the most)
+    -- Early downs use the opponent-adjusted numbers (23_defense_splits): EPA
+    -- allowed vs. what the offenses they faced usually get. A soft spot is
+    -- named only in the top 5 (strong evidence), matching the report card.
     SELECT season, as_of_week AS week, defense AS team,
-        MAX(epa_allowed)  FILTER (WHERE situation = 'early_down' AND play_type = 'run')   AS ed_run,
-        MAX(rank_allowed) FILTER (WHERE situation = 'early_down' AND play_type = 'run')   AS ed_run_rank,
-        MAX(epa_allowed)  FILTER (WHERE situation = 'early_down' AND play_type = 'pass')  AS ed_pass,
-        MAX(rank_allowed) FILTER (WHERE situation = 'early_down' AND play_type = 'pass')  AS ed_pass_rank,
+        MAX(epa_vs_expected)  FILTER (WHERE situation = 'early_down' AND play_type = 'run')   AS ed_run,
+        MAX(rank_allowed_adj) FILTER (WHERE situation = 'early_down' AND play_type = 'run')   AS ed_run_rank,
+        MAX(epa_vs_expected)  FILTER (WHERE situation = 'early_down' AND play_type = 'pass')  AS ed_pass,
+        MAX(rank_allowed_adj) FILTER (WHERE situation = 'early_down' AND play_type = 'pass')  AS ed_pass_rank,
         MAX(epa_allowed)  FILTER (WHERE situation = 'third_long' AND play_type = 'pass')  AS tl_pass,
         MAX(rank_allowed) FILTER (WHERE situation = 'third_long' AND play_type = 'pass')  AS tl_pass_rank,
         MAX(epa_allowed)  FILTER (WHERE situation = 'third_short' AND play_type = 'run')  AS ts_run,
@@ -384,21 +387,22 @@ attack AS (
             CAST(round(td.pass_ypg) AS INTEGER), ' passing (', note_most(td.pass_ypg_rank, td.teams), ').',
             CASE WHEN uo.rush_rank <= 8 AND td.rush_ypg_rank >= td.teams - 7 THEN ' It''s strength on strength on the ground.'
                  WHEN uo.rush_rank <= 8 AND td.rush_ypg_rank <= 10 THEN ' That''s a matchup to lean on.' END, ' ') END,
-          CASE WHEN d.ed_run_rank <= 10 AND d.ed_pass_rank <= 10
+          CASE WHEN d.ed_run_rank <= 5 AND d.ed_pass_rank <= 5
                  THEN concat('The ', m.nick, ' defense is soft on early downs against both the run (', note_epa(d.ed_run),
-                             ' EPA per run allowed, ', note_most(d.ed_run_rank, d.teams), ' in the league) and the pass (',
+                             ' EPA per run vs. what offenses usually get, ', note_most(d.ed_run_rank, d.teams), ' in the league) and the pass (',
                              note_epa(d.ed_pass), ' per dropback, ', note_most(d.ed_pass_rank, d.teams), ').')
-               WHEN least(d.ed_run_rank, d.ed_pass_rank) <= 12 AND d.ed_run_rank <= d.ed_pass_rank
-                 THEN concat('Attack them on the ground on early downs: they allow ', note_epa(d.ed_run), ' EPA per run (',
+               WHEN least(d.ed_run_rank, d.ed_pass_rank) <= 5 AND d.ed_run_rank <= d.ed_pass_rank
+                 THEN concat('Attack them on the ground on early downs: they allow ', note_epa(d.ed_run), ' EPA per run more than offenses usually get (',
                              note_most(d.ed_run_rank, d.teams), ' in the league), against ', note_epa(d.ed_pass), ' per dropback (',
                              note_most(d.ed_pass_rank, d.teams), ').')
-               WHEN least(d.ed_run_rank, d.ed_pass_rank) <= 12
-                 THEN concat('Attack them through the air on early downs: they allow ', note_epa(d.ed_pass), ' EPA per dropback (',
+               WHEN least(d.ed_run_rank, d.ed_pass_rank) <= 5
+                 THEN concat('Attack them through the air on early downs: they allow ', note_epa(d.ed_pass), ' EPA per dropback more than offenses usually get (',
                              note_most(d.ed_pass_rank, d.teams), ' in the league), against ', note_epa(d.ed_run), ' per run (',
                              note_most(d.ed_run_rank, d.teams), ').')
-               ELSE concat('There''s no soft spot on early downs: the ', m.nick, ' allow ', note_epa(d.ed_run), ' EPA per run (',
+               ELSE concat('No clear soft spot on early downs once you account for who they''ve played: the ', m.nick, ' allow ',
+                           note_epa(d.ed_run), ' EPA per run vs. what offenses usually get (',
                            note_most(d.ed_run_rank, d.teams), ' in the league) and ', note_epa(d.ed_pass), ' per dropback (',
-                           note_most(d.ed_pass_rank, d.teams), '), so expect to grind and take what they give.') END,
+                           note_most(d.ed_pass_rank, d.teams), ').') END,
           ' On 3rd & 7+ they allow ', note_epa(d.tl_pass), ' per dropback (', note_most(d.tl_pass_rank, d.teams), ')',
           CASE WHEN d.ts_run_n >= 8 THEN concat(', and runs on 3rd & 1-3 get ', note_epa(d.ts_run), ' (', note_most(d.ts_run_rank, d.teams), ')') END,
           '.',
@@ -425,7 +429,7 @@ attack AS (
                  THEN concat(' Our top target, ', ot.receiver_name, ' (', note_pct(ot.share), ' of our targets), is a ',
                              note_pos1(ot.position), ', the position they cover best, so get him the ball on our terms.') END
         ) END AS p5,
-        CASE WHEN least(d.ed_run_rank, d.ed_pass_rank) <= 12 THEN concat(
+        CASE WHEN least(d.ed_run_rank, d.ed_pass_rank) <= 5 THEN concat(
           'Our early-down ', CASE WHEN d.ed_run_rank <= d.ed_pass_rank THEN 'runs' ELSE 'throws' END,
           ': that''s where they''re softest. If the first few work, stay with it.') END AS li_early,
         CASE WHEN ps.position IS NOT NULL THEN concat('Targets to our ', note_pos(ps.position), ': ',

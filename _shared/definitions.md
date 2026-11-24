@@ -74,6 +74,17 @@ Implemented in `sql/models/22_player_trends.sql`, `09_stg_charting.sql` and `37_
 | Heavy box | FTN charting: 8+ defenders in the box at the snap on a designed run. |
 | Man / zone | nflverse participation (FTN), last season only: it is published after the postseason, so the current season has none. Shown labeled with its season. |
 
+## Grading the attack calls (added Nov 24, 2026)
+
+Implemented in `sql/models/23_defense_splits.sql` (adjusted columns) and `sql/models/31_report_card.sql`; the notes' early-down soft spot (`30_draft_notes.sql`) uses the same pick.
+
+| Item | Definition |
+|------|-----------|
+| Opponent-adjusted defense | Season to date, per situation and play type: EPA per play allowed above what the offenses faced usually gain, after crediting those offenses for the defenses they faced (three rounds of offense/defense adjustment). `epa_vs_expected`, `rank_allowed_adj` (1 = softest). |
+| Early-down soft / stout | Called only with strong evidence: top 5 / bottom 5 of 32 in `rank_allowed_adj`. Backtest, weeks 3-11 of 2026: top/bottom 10 on raw EPA hit 53%, top/bottom 5 adjusted 60%. |
+| Net points | For a call graded on EPA (early-down soft/stout, the position they cover worst, red-zone throws): our EPA in that part of the game minus what our offense usually gets on the same number of plays. "Usually" = our season to date before the game in that situation, blended with 30 plays of league average. |
+| No real impact | Net points within 2 either way. Shown, but counted neither right nor wrong. One big play can still decide a call. |
+
 ## Trades during the season
 
 nflverse's trade feed can lag by months (on Oct 30, 2026 its newest trade was from April), so the check has two other sources:
