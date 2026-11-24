@@ -1,6 +1,7 @@
 -- Pick stars (39_pick_stars.sql): every W2 game with lines has exactly one
 -- spread and one total row. Spreads are unrated (no stars or points parts);
--- totals have each part in range and stars = 1 + points, at most 5. The pick
+-- totals under 6 points off are no-play (no stars); totals 6+ off have each
+-- part in range and stars = 1 + points, 2 to 5. The pick
 -- is one of the game's teams (spread) or over/under (total).
 WITH expected AS (
     SELECT w.game_id FROM w2_predictions w
@@ -18,12 +19,16 @@ SELECT game_id, market, 'spread should be unrated'
 FROM pick_stars
 WHERE market = 'spread' AND (stars IS NOT NULL OR gap_pts IS NOT NULL)
 UNION ALL
+SELECT game_id, market, 'no-play total should be unrated'
+FROM pick_stars
+WHERE market = 'total' AND gap < 6 AND (stars IS NOT NULL OR gap_pts IS NOT NULL)
+UNION ALL
 SELECT game_id, market, 'total part out of range or stars wrong'
 FROM pick_stars
-WHERE market = 'total'
-  AND (gap_pts NOT IN (0, 2, 3) OR support_pts NOT BETWEEN 0 AND 1 OR risk_pts NOT BETWEEN -1 AND 0
-       OR points <> greatest(gap_pts + support_pts + risk_pts, 0)
-       OR stars IS NULL OR stars <> least(1 + points, 5))
+WHERE market = 'total' AND gap >= 6
+  AND (gap_pts IS NULL OR gap_pts NOT IN (2, 3) OR support_pts NOT BETWEEN 0 AND 1 OR risk_pts NOT BETWEEN -1 AND 0
+       OR points <> gap_pts + support_pts + risk_pts
+       OR stars IS NULL OR stars <> least(1 + points, 5) OR stars < 2)
 UNION ALL
 SELECT game_id, market, 'pick not in game'
 FROM pick_stars
