@@ -1,7 +1,10 @@
--- prop_stars: a 1-5 star score on each player prop line in
--- config/prop_lines.csv (raw_prop_lines), for the Predictions tab. One row
--- per game x player x market; the pick is over or under. Same point scale and
--- star cutoffs as 39_pick_stars.sql. Rules: _shared/definitions.md, "Pick stars".
+-- prop_stars: a lean on each player prop line in config/prop_lines.csv
+-- (raw_prop_lines), for the Predictions tab. One row per game x player x
+-- market; the pick is over or under. Rules: _shared/definitions.md, "Pick stars".
+--
+-- Unrated for now (stars NULL): there is no prop model and no history of prop
+-- lines to test the points against. The points below only order the leans;
+-- they can become stars once the pulled lines have been graded for a while.
 --
 -- Only players in player_trends (each team's top QB, 2 backs, 4 WR/TE) can be
 -- scored; the book's name is matched to his after dropping case, punctuation
@@ -143,11 +146,7 @@ SELECT
     round(projection, 1) AS projection, round(gap_share, 3) AS gap_share,
     gap_pts, agree_pts, support_pts, risk_pts,
     gap_pts + agree_pts + support_pts + risk_pts AS points,
-    CASE WHEN gap_pts + agree_pts + support_pts + risk_pts <= 1 THEN 1
-         WHEN gap_pts + agree_pts + support_pts + risk_pts = 2 THEN 2
-         WHEN gap_pts + agree_pts + support_pts + risk_pts <= 4 THEN 3
-         WHEN gap_pts + agree_pts + support_pts + risk_pts <= 6 THEN 4
-         ELSE 5 END AS stars,
+    NULL::INTEGER AS stars,  -- unrated until graded prop lines back the points
     list_filter([
         'Projects ' || CAST(round(projection, 1) AS VARCHAR) || ' (season ' || CAST(round(season_avg, 1) AS VARCHAR)
             || COALESCE(', last 4 ' || CAST(round(last4_avg, 1) AS VARCHAR), '') || ')',

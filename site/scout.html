@@ -230,7 +230,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
 <main class="wrap" id="app"><p class="empty">Loading this week's numbers…</p></main>
 
 <footer class="wrap">
-  <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. Win chances are model estimates, shown next to the market's chance from the moneylines with the bookmaker's margin removed. W2 is the newest model: a ridge-regression model (M6) plus the game-day rain and wind forecast, trained on 2017-2024 games; its lines ("My model's lines", under Current lines) are its predicted margin and total points, rounded to the half point. Elo is the original: every team's strength, updated after each game, with home field and rest after a bye. Star picks rate W2's totals and each prop line from 1 to 5 stars. A total's stars come from how far W2's total is from the line (6+ points went 58% in W2's 2019-2024 out-of-sample predictions) plus wind or rain; W2's spread pick is shown as an unrated lean because the same test found no spread edge. Props use the player's averages vs the line, the matchup, W2's game script and injury risk, and are untested. All picks are graded as results come in. Trend records count each game against its closing line. Player trends come from the play-by-play, so they can differ slightly from official box scores; per-game averages use the games the player played. They are trends next to what the defense allows; prop lines, when pulled, are scored under Star picks. Only games before this week are used.</p>
+  <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. Win chances are model estimates, shown next to the market's chance from the moneylines with the bookmaker's margin removed. W2 is the newest model: a ridge-regression model (M6) plus the game-day rain and wind forecast, trained on 2017-2024 games; its lines ("My model's lines", under Current lines) are its predicted margin and total points, rounded to the half point. Elo is the original: every team's strength, updated after each game, with home field and rest after a bye. Star picks rate W2's totals from 1 to 5 stars. A total's stars come from how far W2's total is from the line (6+ points went 58% in W2's 2019-2024 out-of-sample predictions) plus wind or rain; W2's spread pick is shown as an unrated lean because the same test found no spread edge. Prop leans use the player's averages vs the line, the matchup, W2's game script and injury risk; they are unrated until the pulled lines have been graded long enough to test them. All picks are graded as results come in. Trend records count each game against its closing line. Player trends come from the play-by-play, so they can differ slightly from official box scores; per-game averages use the games the player played. They are trends next to what the defense allows; prop lines, when pulled, are shown as leans under Star picks. Only games before this week are used.</p>
   <p id="how-attack" hidden><strong>How to read this.</strong> The attack plan puts one offense next to the defense it faces this week. Run sides and pass areas are from the offense's view (left, middle, right of the offense) on both sides, using neutral downs (win probability 5-95%). A defense's rank of 1 means it allows the most EPA per play there; "soft spot" is the worst quarter of the league, "tough" the best quarter. Blitz, box and play action are this season's FTN charting; man/zone is last season's, the latest public. Only games before this week are used.</p>
   <p id="how-scout"><strong>How to read this.</strong> Every dot is one NFL team, ranked on the same plays. The big dot is the team you picked, the dark line is the league average. Pass rate counts sacks and scrambles as passes. Pass rate over expected compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse xpass model). EPA is expected points added per play; above 0 helps the offense. Early downs, 3rd down, red zone and all neutral use only plays with the offense's win probability between 5% and 95%; 2-minute and trailing by 8+ use every play. Numbers on fewer than 30 plays are greyed and marked * and never make "What stands out". Only games before this week are used.</p>
   <p id="foot-meta"></p>
@@ -605,7 +605,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
   }
   // ---- Star picks: 1-5 stars on W2's side and total and on prop lines (39/40 models).
   const starTxt = n => `<span class="stars" aria-label="${n} of 5 stars">${"★".repeat(n)}<span class="off">${"★".repeat(5 - n)}</span></span>`;
-  const pickRow = (label, n, reasons) => `<div class="pick"><div><b>${esc(label)}</b><div class="why">${(reasons || []).map(esc).join(" · ")}</div></div>${n ? starTxt(n) : `<span class="est" title="No spread edge in W2's 2019-2024 backtest; graded so it can earn stars">Unrated lean</span>`}</div>`;
+  const pickRow = (label, n, reasons) => `<div class="pick"><div><b>${esc(label)}</b><div class="why">${(reasons || []).map(esc).join(" · ")}</div></div>${n ? starTxt(n) : `<span class="est" title="Not tested yet; graded so it can earn stars">Unrated lean</span>`}</div>`;
   function tallyTable(tally, note) {
     const rows = [5, 4, 3, 2, 1, "spread"].filter(n => tally[n]);
     return `<table class="starrec" style="margin-top:10px"><thead><tr><th>Stars</th><th>Record</th><th>Win %</th></tr></thead><tbody>${rows.map(n => { const t = tally[n], dec = t.W + t.L;
@@ -637,21 +637,20 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
     if (!d.picks && !d.prop_picks) return "";
     const gid = game ? ((d.lines || []).find(l => (l.home_team === team && l.away_team === game.opponent) || (l.away_team === team && l.home_team === game.opponent)) || {}).game_id : null;
     const mine = (d.picks || []).filter(p => p.game_id === gid).sort((a, b) => a.market.localeCompare(b.market));
-    const props = (d.prop_picks || []).filter(p => p.game_id === gid).slice().sort((a, b) => b.stars - a.stars || b.points - a.points).slice(0, 8);
+    const props = (d.prop_picks || []).filter(p => p.game_id === gid).slice().sort((a, b) => b.points - a.points).slice(0, 8);
     const best = (d.picks || []).filter(p => p.stars >= 3).slice().sort((a, b) => b.stars - a.stars || b.gap - a.gap).slice(0, 5);
-    const bestProps = (d.prop_picks || []).filter(p => p.stars >= 4).slice().sort((a, b) => b.stars - a.stars || b.points - a.points).slice(0, 5);
     const gameName = id => { const l = (d.lines || []).find(x => x.game_id === id); return l ? `${l.away_team} @ ${l.home_team}` : ""; };
     const thisGame = !game ? "" : !gid || !mine.length ? `<p class="muted">No star picks for this game yet: they need W2's numbers and the market's lines.</p>`
       : `<div class="picks">${mine.map(p => pickRow(p.pick_label, p.stars, p.reasons)).join("")}</div>`;
-    const propBlock = !game ? "" : props.length ? `<h2 style="margin-top:16px">Player props</h2><div class="picks">${props.map(p => pickRow(`${p.player} ${p.pick_label}`, p.stars, p.reasons)).join("")}</div>`
-      : `<p class="muted" style="margin:12px 0 0">No prop lines for this game yet. They're pulled once a week on Saturday.</p>`;
-    const league = best.length || bestProps.length ? `<div class="box"><h2>Top-rated this week</h2><div class="picks">
+    const propBlock = !game ? "" : props.length ? `<h2 style="margin-top:16px">Player prop leans</h2><div class="picks">${props.map(p => pickRow(`${p.player} ${p.pick_label}`, p.stars, p.reasons)).join("")}</div>`
+      : `<p class="muted" style="margin:12px 0 0">No prop lines for this game yet. They're pulled Thursday morning (Thursday and Friday games) and Saturday morning.</p>`;
+    const league = best.length ? `<div class="box"><h2>Top-rated this week</h2><div class="picks">
         ${best.map(p => pickRow(`${p.pick_label} · ${gameName(p.game_id)}`, p.stars, p.reasons)).join("")}
-        ${bestProps.map(p => pickRow(`${p.player} ${p.pick_label} · ${gameName(p.game_id)}`, p.stars, p.reasons)).join("")}</div>
+</div>
         ${starRecord(preds)}</div>` : `<div class="box"><h2>Star record</h2>${starRecord(preds)}</div>`;
     return `<section class="lead">
       <div class="box"><h2>Star picks <span class="est" style="margin-left:6px">New</span></h2>${thisGame}${propBlock}
-        <p class="muted" style="margin:10px 0 0">Totals: stars come from how far W2's total is from the line plus wind or rain; W2's totals 6+ points off went 58% in 2019-2024 out-of-sample tests. Spreads: W2 showed no edge there, so its side is an unrated lean, graded until it earns stars. Props: average vs the line, matchup, game script and injury risk (untested). Live since week 12.</p></div>
+        <p class="muted" style="margin:10px 0 0">Totals: stars come from how far W2's total is from the line plus wind or rain; W2's totals 6+ points off went 58% in 2019-2024 out-of-sample tests. Spreads: W2 showed no edge there, so its side is an unrated lean, graded until it earns stars. Props: unrated leans (average vs the line, matchup, game script, injury risk) until enough lines are graded to test them. Live since week 12.</p></div>
       ${league}</section>`;
   }
   function modelRecord(preds) {
@@ -851,7 +850,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
     players.sort((a, b) => order[a.role] - order[b.role] || a.role_rank - b.role_rank);
     if (!players.length) return "";
     return `<h2 class="sec">${esc(info.nick)} player trends for props</h2>
-      <p class="muted" style="margin:0 0 8px">Per-game averages next to what the ${esc(oppInfo.nick)} allow. Trends only, not betting advice; scored prop lines are under Star picks above. <a href="#${esc(game.opponent)}/predictions" style="color:var(--accent);font-weight:600;text-decoration:none">${esc(oppInfo.nick)} players →</a></p>
+      <p class="muted" style="margin:0 0 8px">Per-game averages next to what the ${esc(oppInfo.nick)} allow. Trends only, not betting advice; prop leans are under Star picks above. <a href="#${esc(game.opponent)}/predictions" style="color:var(--accent);font-weight:600;text-decoration:none">${esc(oppInfo.nick)} players →</a></p>
       <section class="grid">${players.map(p => propCard(d, p, oppInfo)).join("")}</section>`;
   }
 

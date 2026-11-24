@@ -1,5 +1,5 @@
 -- Prop stars (40_prop_stars.sql): one row per game x player x market; each
--- part in its range, the points add up, the stars follow the cutoffs, and the
+-- part in its range, the points add up, no stars yet (unrated), and the
 -- player is on one of the game's teams. Prop lines (config/prop_lines.csv)
 -- name a scheduled game, a known market and a positive line, once each.
 SELECT game_id, player, market, 'more than one row' AS problem
@@ -14,8 +14,7 @@ UNION ALL
 SELECT game_id, player, market, 'points or stars wrong'
 FROM prop_stars
 WHERE points <> gap_pts + agree_pts + support_pts + risk_pts
-   OR stars <> CASE WHEN points <= 1 THEN 1 WHEN points = 2 THEN 2 WHEN points <= 4 THEN 3
-                    WHEN points <= 6 THEN 4 ELSE 5 END
+   OR stars IS NOT NULL
    OR team NOT IN (home_team, away_team)
 UNION ALL
 SELECT l.game_id, l.player, l.market, 'bad prop line'
