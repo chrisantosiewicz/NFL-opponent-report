@@ -18,7 +18,8 @@
 -- defense, the position they cover worst, red-zone throws) are graded on net
 -- points: our EPA in that part of the game minus what our offense usually gets
 -- on the same number of plays (its season to date, blended with 30 plays of
--- league average). Within 2 points either way = No real impact; one big play
+-- league average). Within 1.5 points either way = No real impact (set Nov 24,
+-- 2026; reassess at season's end); one big play
 -- can still decide it. (Changed Nov 24, 2026.)
 -- Didn't come up = too few plays in the game to say (thresholds below).
 -- Calls with no clear lean that week are left out, as they are in the notes.
@@ -30,7 +31,7 @@ CREATE OR REPLACE MACRO net_points(sum_epa, n, prior_sum, prior_n, league) AS
 CREATE OR REPLACE MACRO note_net(x) AS
     CASE WHEN round(x, 1) >= 0 THEN '+' ELSE '−' END || CAST(round(abs(x), 1) AS VARCHAR) || ' points vs. our usual';
 CREATE OR REPLACE MACRO net_verdict(net, called_soft) AS CASE
-    WHEN abs(net) < 2 THEN 'No real impact'
+    WHEN abs(net) < 1.5 THEN 'No real impact'
     WHEN (net > 0) = called_soft THEN 'Hit' ELSE 'Miss' END;
 
 CREATE OR REPLACE TABLE report_card AS
