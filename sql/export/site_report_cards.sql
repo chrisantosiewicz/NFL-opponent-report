@@ -25,11 +25,11 @@ COPY (
          FROM (SELECT call_no, any_value(side) AS side, any_value(kind) AS kind,
                       CASE call_no WHEN 4 THEN 'Top target''s share' WHEN 5 THEN 'Take away the top target'
                                    WHEN 12 THEN 'Target the position they cover worst' ELSE any_value(call) END AS label,
-                      COUNT(*) FILTER (WHERE verdict <> 'Didn''t come up') AS graded,
+                      COUNT(*) FILTER (WHERE verdict NOT IN ('Didn''t come up', 'No real impact')) AS graded,
                       COUNT(*) FILTER (WHERE verdict IN ('Hit', 'Called it')) AS right_n,
                       COUNT(*) FILTER (WHERE verdict = 'Held') AS held_n
                FROM report_card WHERE season = {{season}} AND basis = 'in_season' GROUP BY call_no)) AS call_summary,
-        (SELECT {graded: COUNT(*) FILTER (WHERE verdict <> 'Didn''t come up'),
+        (SELECT {graded: COUNT(*) FILTER (WHERE verdict NOT IN ('Didn''t come up', 'No real impact')),
                  correct: COUNT(*) FILTER (WHERE verdict IN ('Hit', 'Called it')),
                  held: COUNT(*) FILTER (WHERE verdict = 'Held')}
          FROM report_card WHERE season = {{season}} AND basis = 'last_season') AS week1_summary

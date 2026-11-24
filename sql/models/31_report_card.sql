@@ -14,10 +14,25 @@
 --             whether the call was right)
 --             offense side: Hit (we got it) / Miss
 -- Mixed = yards and EPA disagree (run lanes).
+-- Attack calls on our side that are graded on EPA (soft/stout early-down
+-- defense, the position they cover worst, red-zone throws) are graded on net
+-- points: our EPA in that part of the game minus what our offense usually gets
+-- on the same number of plays (its season to date, blended with 30 plays of
+-- league average). Within 1.5 points either way = No real impact (set Nov 24,
+-- 2026; reassess at season's end); one big play
+-- can still decide it. (Changed Nov 24, 2026.)
 -- Didn't come up = too few plays in the game to say (thresholds below).
 -- Calls with no clear lean that week are left out, as they are in the notes.
 -- Week 1 is scouted from last season's full regular season (basis =
 -- 'last_season'), so its grades are kept apart from the in-season rates.
+
+CREATE OR REPLACE MACRO net_points(sum_epa, n, prior_sum, prior_n, league) AS
+    sum_epa - n * (COALESCE(prior_sum, 0) + 30 * league) / (COALESCE(prior_n, 0) + 30);
+CREATE OR REPLACE MACRO note_net(x) AS
+    CASE WHEN round(x, 1) >= 0 THEN '+' ELSE '−' END || CAST(round(abs(x), 1) AS VARCHAR) || ' points vs. our usual';
+CREATE OR REPLACE MACRO net_verdict(net, called_soft) AS CASE
+    WHEN abs(net) < 1.5 THEN 'No real impact'
+    WHEN (net > 0) = called_soft THEN 'Hit' ELSE 'Miss' END;
 
 CREATE OR REPLACE TABLE report_card AS
 WITH
@@ -48,13 +63,20 @@ ours AS (     -- our offense against their defense in the graded game
     FROM m JOIN stg_plays p ON p.game_id = m.game_id AND p.team = m.opponent
 ),
 
+-- our offense in the games before the graded one: what "our usual" means
+our_prior AS (
+    SELECT m.season, m.week, m.team, p.* EXCLUDE (season, week, team)
+    FROM m JOIN stg_plays p ON p.season = m.season AND p.team = m.opponent AND p.week < m.week
+),
+
 tr AS (
     SELECT season, as_of_week AS week, team, situation, metric, value, league_rank, league_teams, n, league_avg
     FROM tendency_ranks WHERE span = 'season'
 ),
 
 ds AS (
-    SELECT season, as_of_week AS week, defense AS team, situation, play_type, plays, epa_allowed, rank_allowed, teams, league_epa
+    SELECT season, as_of_week AS week, defense AS team, situation, play_type, plays, epa_allowed, rank_allowed, teams, league_epa,
+           epa_vs_expected, rank_allowed_adj
     FROM defense_splits WHERE span = 'season'
 ),
 
@@ -243,21 +265,33 @@ c_late AS (
 ),
 
 -- 9 and 10. Their early-down run and pass defense --------------------------------
+-- Only when the evidence is strong: top or bottom 5 after adjusting for the
+-- offenses they've faced (rank_allowed_adj). Top/bottom 10 on raw EPA hit 53%;
+-- top/bottom 5 adjusted hit 60% in a weeks 3-11 2026 backtest. Not called in
+-- weeks 2-4: with 1-3 games of data the pick was a coin flip in both 2025
+-- (48%) and 2026 (52%) in weeks 3-4. Week 1 (last season's full year) stays.
 c_defense AS (
     SELECT m.season, m.week, m.team, CASE d.play_type WHEN 'run' THEN 10 ELSE 11 END, 'offense', 'tendency',
         CASE d.play_type WHEN 'run' THEN 'Their early-down run defense' ELSE 'Their early-down pass defense' END,
-        concat(CASE WHEN d.rank_allowed <= 10 THEN 'Soft: ' ELSE 'Stout: ' END, note_epa(d.epa_allowed), ' EPA per ',
-               CASE d.play_type WHEN 'run' THEN 'run' ELSE 'dropback' END, ' allowed (', note_most(d.rank_allowed, d.teams), ')'),
-        concat('We had ', note_epa(g.epa), ' EPA and ', note_yds(g.ypp), ' yards per play on ', g.n, ' (league ', note_epa(d.league_epa), ')'),
+        concat(CASE WHEN d.rank_allowed_adj <= 5 THEN 'Soft: ' ELSE 'Stout: ' END, note_epa(d.epa_vs_expected), ' EPA per ',
+               CASE d.play_type WHEN 'run' THEN 'run' ELSE 'dropback' END, ' vs. what offenses usually get (',
+               note_most(d.rank_allowed_adj, d.teams), ')'),
+        concat('We had ', note_epa(g.epa), ' EPA per play on ', g.n, ', ',
+               note_net(net_points(g.sum_epa, g.n, pr.sum_epa, pr.n, d.league_epa))),
         CASE WHEN g.n < 6 THEN 'Didn''t come up'
-             WHEN (d.rank_allowed <= 10) = (g.epa > d.league_epa) THEN 'Hit' ELSE 'Miss' END
+             ELSE net_verdict(net_points(g.sum_epa, g.n, pr.sum_epa, pr.n, d.league_epa), d.rank_allowed_adj <= 5) END
     FROM m
     JOIN ds d ON d.season = m.season AND d.week = m.week AND d.team = m.team AND d.situation = 'early_down'
-             AND (d.rank_allowed <= 10 OR d.rank_allowed >= d.teams - 9)
+             AND (d.rank_allowed_adj <= 5 OR d.rank_allowed_adj >= d.teams - 4)
+             AND (m.week = 1 OR m.week >= 5)
     JOIN (SELECT season, week, team, CASE WHEN is_pass = 1 THEN 'pass' ELSE 'run' END AS play_type,
-                 COUNT(*) AS n, AVG(epa) AS epa, AVG(yards_gained) AS ypp
+                 COUNT(*) AS n, AVG(epa) AS epa, SUM(COALESCE(epa, 0)) AS sum_epa
           FROM ours WHERE is_early_down AND is_neutral_wp GROUP BY ALL) g
       ON g.season = m.season AND g.week = m.week AND g.team = m.team AND g.play_type = d.play_type
+    LEFT JOIN (SELECT season, week, team, CASE WHEN is_pass = 1 THEN 'pass' ELSE 'run' END AS play_type,
+                      COUNT(*) AS n, SUM(COALESCE(epa, 0)) AS sum_epa
+               FROM our_prior WHERE is_early_down AND is_neutral_wp GROUP BY ALL) pr
+      ON pr.season = m.season AND pr.week = m.week AND pr.team = m.team AND pr.play_type = d.play_type
 ),
 
 -- 11. The position they cover worst (warning, our side) --------------------------
@@ -265,9 +299,11 @@ c_position AS (
     SELECT m.season, m.week, m.team, 12, 'offense', 'warning', concat('Target their coverage of ', note_pos(v.position)),
         concat(note_epa(v.epa_per_target), ' EPA per target allowed (', note_most(v.rank_allowed, v.teams), ')'),
         concat(COUNT(o.play_id), ' targets, ', CAST(COALESCE(SUM(o.yards_gained), 0) AS INTEGER), ' yards, ',
-               note_epa(COALESCE(SUM(o.epa), 0)), ' EPA'),
+               note_epa(COALESCE(SUM(o.epa), 0)), ' EPA, ',
+               note_net(net_points(COALESCE(SUM(o.epa), 0), COUNT(o.play_id), ANY_VALUE(pr.sum_epa), ANY_VALUE(pr.n), v.league_epa_per_target))),
         CASE WHEN COUNT(o.play_id) < 3 THEN 'Didn''t come up'
-             WHEN AVG(o.epa) > v.league_epa_per_target THEN 'Hit' ELSE 'Miss' END
+             ELSE net_verdict(net_points(COALESCE(SUM(o.epa), 0), COUNT(o.play_id), ANY_VALUE(pr.sum_epa), ANY_VALUE(pr.n),
+                                         v.league_epa_per_target), true) END
     FROM m
     JOIN (SELECT *, ROW_NUMBER() OVER (PARTITION BY season, as_of_week, defense ORDER BY rank_allowed, position) AS pick_no
           FROM defense_vs_position WHERE targets >= 20) v
@@ -276,6 +312,11 @@ c_position AS (
                FROM ours o JOIN (SELECT DISTINCT gsis_id, position FROM raw_players) pl ON pl.gsis_id = o.receiver_id
                WHERE o.is_pass = 1) o
       ON o.season = m.season AND o.week = m.week AND o.team = m.team AND o.position = v.position
+    LEFT JOIN (SELECT o.season, o.week, o.team, CASE WHEN pl.position IN ('FB', 'HB') THEN 'RB' ELSE pl.position END AS position,
+                      COUNT(*) AS n, SUM(COALESCE(o.epa, 0)) AS sum_epa
+               FROM our_prior o JOIN (SELECT DISTINCT gsis_id, position FROM raw_players) pl ON pl.gsis_id = o.receiver_id
+               WHERE o.is_pass = 1 GROUP BY ALL) pr
+      ON pr.season = m.season AND pr.week = m.week AND pr.team = m.team AND pr.position = v.position
     GROUP BY m.season, m.week, m.team, v.position, v.epa_per_target, v.rank_allowed, v.teams, v.league_epa_per_target
 ),
 
@@ -313,15 +354,21 @@ c_redzone AS (
     SELECT m.season, m.week, m.team, 14, 'offense', 'warning', 'Throw it in the red zone',
         concat(note_epa(d.epa_allowed), ' per dropback allowed inside the 20 (', note_most(d.rank_allowed, d.teams), ')'),
         CASE WHEN g.n IS NULL THEN 'No red-zone dropbacks'
-             ELSE concat(g.n, ' dropbacks, ', note_epa(g.epa), ' EPA each, ', g.td, ' TD') END,
-        CASE WHEN COALESCE(g.n, 0) < 3 THEN 'Didn''t come up' WHEN g.epa > d.league_epa THEN 'Hit' ELSE 'Miss' END
+             ELSE concat(g.n, ' dropbacks, ', note_epa(g.epa), ' EPA each, ', g.td, ' TD, ',
+                         note_net(net_points(g.sum_epa, g.n, pr.sum_epa, pr.n, d.league_epa))) END,
+        CASE WHEN COALESCE(g.n, 0) < 3 THEN 'Didn''t come up'
+             ELSE net_verdict(net_points(g.sum_epa, g.n, pr.sum_epa, pr.n, d.league_epa), true) END
     FROM m
     JOIN ds d ON d.season = m.season AND d.week = m.week AND d.team = m.team AND d.situation = 'red_zone'
              AND d.play_type = 'pass' AND d.plays >= 15 AND d.rank_allowed <= 8
-    LEFT JOIN (SELECT season, week, team, COUNT(*) AS n, AVG(epa) AS epa,
+    LEFT JOIN (SELECT season, week, team, COUNT(*) AS n, AVG(epa) AS epa, SUM(COALESCE(epa, 0)) AS sum_epa,
                       COUNT(*) FILTER (WHERE yards_gained >= yardline_100) AS td   -- gained the whole field left
                FROM ours WHERE is_red_zone AND is_pass = 1 GROUP BY ALL) g
       ON g.season = m.season AND g.week = m.week AND g.team = m.team
+
+    LEFT JOIN (SELECT season, week, team, COUNT(*) AS n, SUM(COALESCE(epa, 0)) AS sum_epa
+               FROM our_prior WHERE is_red_zone AND is_pass = 1 GROUP BY ALL) pr
+      ON pr.season = m.season AND pr.week = m.week AND pr.team = m.team
 ),
 
 -- A starting quarterback the calls weren't built on: the game's main passer
