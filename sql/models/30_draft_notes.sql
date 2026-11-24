@@ -406,9 +406,13 @@ attack AS (
                            note_epa(d.ed_run), ' EPA per run vs. what offenses usually get (',
                            note_most(d.ed_run_rank, d.teams), ' in the league) and ', note_epa(d.ed_pass), ' per dropback (',
                            note_most(d.ed_pass_rank, d.teams), ').') END,
-          ' On 3rd & 7+ they allow ', note_epa(d.tl_pass), ' per dropback (', note_most(d.tl_pass_rank, d.teams), ')',
-          CASE WHEN d.ts_run_n >= 8 THEN concat(', and runs on 3rd & 1-3 get ', note_epa(d.ts_run), ' (', note_most(d.ts_run_rank, d.teams), ')') END,
-          '.',
+          -- 3rd & 7+ pass defense only when top or bottom 5 (it barely carries over).
+          CASE WHEN d.tl_pass_rank <= 5 OR d.tl_pass_rank >= d.teams - 4
+               THEN concat(' On 3rd & 7+ they allow ', note_epa(d.tl_pass), ' per dropback (', note_most(d.tl_pass_rank, d.teams), ')',
+                           CASE WHEN d.ts_run_n >= 8 THEN concat(', and runs on 3rd & 1-3 get ', note_epa(d.ts_run), ' (', note_most(d.ts_run_rank, d.teams), ')') END,
+                           '.')
+               WHEN d.ts_run_n >= 8
+               THEN concat(' Runs on 3rd & 1-3 get ', note_epa(d.ts_run), ' against them (', note_most(d.ts_run_rank, d.teams), ').') END,
           CASE WHEN d.rz_pass_n >= 15 AND d.rz_pass_rank <= 8
                  THEN concat(' Inside their 20 they''ve been easier to throw on: ', note_epa(d.rz_pass), ' per dropback (',
                              note_most(d.rz_pass_rank, d.teams), ') on ', d.rz_pass_n, ' plays.')
@@ -505,16 +509,22 @@ paragraphs AS (
                CASE WHEN f.sit2 IS NOT NULL THEN concat(' and ', note_sit(f.sit2), ' (', f.sit2_targets, ' of ', f.sit2_team_targets, ')') END, '.') END
         ) END AS p2,
 
-        -- 3. Where drives end up: 3rd & long, and late in halves
-        concat(
-          CASE WHEN f.long_share >= f.lg_long_share + 0.05
-               THEN concat('They live in 3rd & long: ', note_pct(f.long_share), ' of their third downs have been 7+ to go (league ',
-                           note_pct(f.lg_long_share), '), ')
-               WHEN f.long_share <= f.lg_long_share - 0.05
-               THEN concat('They stay ahead of the chains: only ', note_pct(f.long_share), ' of their third downs have been 7+ to go (league ',
-                           note_pct(f.lg_long_share), '), ')
-               ELSE concat(note_pct(f.long_share), ' of their third downs have been 7+ to go (league ', note_pct(f.lg_long_share), '), ') END,
-          'and there they are ', note_ord(f.tl_rank), ' at ', note_epa(f.tl_play), ' EPA per play.',
+        -- 3. Where drives end up: 3rd & long, and late in halves. The 3rd & 7+
+        -- share and EPA are shown only when far from average (share 8+ points
+        -- off the league, about the top and bottom 7 teams; EPA top or bottom 5).
+        -- Neither carries over well between halves of a season, so it is
+        -- context, not a graded call.
+        NULLIF(trim(concat(
+          CASE WHEN abs(f.long_share - f.lg_long_share) >= 0.08 THEN concat(
+                 CASE WHEN f.long_share > f.lg_long_share
+                      THEN concat('They live in 3rd & long: ', note_pct(f.long_share))
+                      ELSE concat('They stay ahead of the chains: only ', note_pct(f.long_share)) END,
+                 ' of their third downs have been 7+ to go (league ', note_pct(f.lg_long_share), ')',
+                 CASE WHEN f.tl_rank <= 5 OR f.tl_rank >= f.teams - 4
+                      THEN concat(', and there they are ', note_ord(f.tl_rank), ' at ', note_epa(f.tl_play), ' EPA per play') END,
+                 '.')
+               WHEN f.tl_rank <= 5 OR f.tl_rank >= f.teams - 4
+               THEN concat('On 3rd & 7+ they are ', note_ord(f.tl_rank), ' at ', note_epa(f.tl_play), ' EPA per play.') END,
           (SELECT CASE
              WHEN nl.plays >= 20 AND nl.epa_rank >= nl.ranked_teams - 7
                THEN concat(' Late in halves when tied or trailing, they''ve been ', note_ord(nl.epa_rank), ' of ', nl.ranked_teams,
@@ -533,7 +543,7 @@ paragraphs AS (
                 AND ld.side = 'offense' AND ld.situation = 'two_minute' AND ld.score_state = 'leading'
            WHERE nl.season = f.season AND nl.as_of_week = f.week AND nl.team = f.team
              AND nl.side = 'offense' AND nl.situation = 'two_minute' AND nl.score_state = 'not_leading')
-        ) AS p3,
+        )), '') AS p3,
 
         -- What to look for
         CASE WHEN f.ed_sg_pct <= 0.25 THEN concat('Under center on 1st and 2nd down: ', note_pct(f.uc_share),
@@ -559,7 +569,7 @@ lines AS (
     UNION ALL SELECT season, week, team, 10, 'h', 'Stopping their offense' FROM paragraphs
     UNION ALL SELECT season, week, team, 11, 'p', p1 FROM paragraphs
     UNION ALL SELECT season, week, team, 12, 'p', p2 FROM paragraphs WHERE p2 IS NOT NULL
-    UNION ALL SELECT season, week, team, 13, 'p', p3 FROM paragraphs
+    UNION ALL SELECT season, week, team, 13, 'p', p3 FROM paragraphs WHERE p3 IS NOT NULL
     UNION ALL SELECT season, week, team, 14, 'p', p_dir FROM their_dir
     UNION ALL SELECT season, week, team, 15, 'h', 'Attacking their defense' FROM attack
     UNION ALL SELECT season, week, team, 16, 'p', p4 FROM attack
