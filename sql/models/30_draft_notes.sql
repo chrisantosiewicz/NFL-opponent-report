@@ -387,7 +387,10 @@ attack AS (
             CAST(round(td.pass_ypg) AS INTEGER), ' passing (', note_most(td.pass_ypg_rank, td.teams), ').',
             CASE WHEN uo.rush_rank <= 8 AND td.rush_ypg_rank >= td.teams - 7 THEN ' It''s strength on strength on the ground.'
                  WHEN uo.rush_rank <= 8 AND td.rush_ypg_rank <= 10 THEN ' That''s a matchup to lean on.' END, ' ') END,
-          CASE WHEN d.ed_run_rank <= 5 AND d.ed_pass_rank <= 5
+          CASE WHEN m.week BETWEEN 2 AND 4
+                 THEN concat('It''s too early to name a soft spot on early downs: with ', m.week - 1,
+                             CASE WHEN m.week = 2 THEN ' game' ELSE ' games' END, ' played, those numbers have been a coin flip in past seasons.')
+               WHEN d.ed_run_rank <= 5 AND d.ed_pass_rank <= 5
                  THEN concat('The ', m.nick, ' defense is soft on early downs against both the run (', note_epa(d.ed_run),
                              ' EPA per run vs. what offenses usually get, ', note_most(d.ed_run_rank, d.teams), ' in the league) and the pass (',
                              note_epa(d.ed_pass), ' per dropback, ', note_most(d.ed_pass_rank, d.teams), ').')
@@ -429,7 +432,7 @@ attack AS (
                  THEN concat(' Our top target, ', ot.receiver_name, ' (', note_pct(ot.share), ' of our targets), is a ',
                              note_pos1(ot.position), ', the position they cover best, so get him the ball on our terms.') END
         ) END AS p5,
-        CASE WHEN least(d.ed_run_rank, d.ed_pass_rank) <= 5 THEN concat(
+        CASE WHEN least(d.ed_run_rank, d.ed_pass_rank) <= 5 AND NOT m.week BETWEEN 2 AND 4 THEN concat(
           'Our early-down ', CASE WHEN d.ed_run_rank <= d.ed_pass_rank THEN 'runs' ELSE 'throws' END,
           ': that''s where they''re softest. If the first few work, stay with it.') END AS li_early,
         CASE WHEN ps.position IS NOT NULL THEN concat('Targets to our ', note_pos(ps.position), ': ',

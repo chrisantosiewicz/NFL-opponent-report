@@ -267,7 +267,9 @@ c_late AS (
 -- 9 and 10. Their early-down run and pass defense --------------------------------
 -- Only when the evidence is strong: top or bottom 5 after adjusting for the
 -- offenses they've faced (rank_allowed_adj). Top/bottom 10 on raw EPA hit 53%;
--- top/bottom 5 adjusted hit 60% in a weeks 3-11 2026 backtest.
+-- top/bottom 5 adjusted hit 60% in a weeks 3-11 2026 backtest. Not called in
+-- weeks 2-4: with 1-3 games of data the pick was a coin flip in both 2025
+-- (48%) and 2026 (52%) in weeks 3-4. Week 1 (last season's full year) stays.
 c_defense AS (
     SELECT m.season, m.week, m.team, CASE d.play_type WHEN 'run' THEN 10 ELSE 11 END, 'offense', 'tendency',
         CASE d.play_type WHEN 'run' THEN 'Their early-down run defense' ELSE 'Their early-down pass defense' END,
@@ -281,6 +283,7 @@ c_defense AS (
     FROM m
     JOIN ds d ON d.season = m.season AND d.week = m.week AND d.team = m.team AND d.situation = 'early_down'
              AND (d.rank_allowed_adj <= 5 OR d.rank_allowed_adj >= d.teams - 4)
+             AND (m.week = 1 OR m.week >= 5)
     JOIN (SELECT season, week, team, CASE WHEN is_pass = 1 THEN 'pass' ELSE 'run' END AS play_type,
                  COUNT(*) AS n, AVG(epa) AS epa, SUM(COALESCE(epa, 0)) AS sum_epa
           FROM ours WHERE is_early_down AND is_neutral_wp GROUP BY ALL) g

@@ -81,7 +81,7 @@ Implemented in `sql/models/23_defense_splits.sql` (adjusted columns) and `sql/mo
 | Item | Definition |
 |------|-----------|
 | Opponent-adjusted defense | Season to date, per situation and play type: EPA per play allowed above what the offenses faced usually gain, after crediting those offenses for the defenses they faced (three rounds of offense/defense adjustment). `epa_vs_expected`, `rank_allowed_adj` (1 = softest). |
-| Early-down soft / stout | Called only with strong evidence: top 5 / bottom 5 of 32 in `rank_allowed_adj`. Backtest, weeks 3-11 of 2026: top/bottom 10 on raw EPA hit 53%, top/bottom 5 adjusted 60%. |
+| Early-down soft / stout | Called only with strong evidence: top 5 / bottom 5 of 32 in `rank_allowed_adj`. Backtest, weeks 3-11 of 2026: top/bottom 10 on raw EPA hit 53%, top/bottom 5 adjusted 60%. Not called in weeks 2-4 (1-3 games of data): weeks 3-4 were a coin flip in 2025 (48%) and 2026 (52%); from week 5 on, 58% in 2025 and 66% in 2026 at the 1.5 line. |
 | Net points | For a call graded on EPA (early-down soft/stout, the position they cover worst, red-zone throws): our EPA in that part of the game minus what our offense usually gets on the same number of plays. "Usually" = our season to date before the game in that situation, blended with 30 plays of league average. |
 | No real impact | Net points within 1.5 either way. Shown, but counted neither right nor wrong. One big play can still decide a call. Chosen over 2 because calls landing between 1.5 and 2 were right as often as the rest (2025: 13 of 23, 57%), so a wider line only discards graded calls. Reassess after the 2026 season. |
 
