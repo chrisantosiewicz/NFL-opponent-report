@@ -14,6 +14,6 @@ One job: hold the published reports, the live scout page and the archive.
 
 Do not hand-edit generated files; change what writes them.
 
-A home-page logo opens `scout.html?for=<TEAM>#<TEAM>/attack`: the team's attack plan (its offense vs this week's defense: where to attack, who to target, coverage); player trends for props are on the Predictions tab. `?for=` makes the scout page the fan's (brand, "Your team", a link back to the attack plan); without it the page is the Bears', as before. Tabs: `#<TEAM>/attack`, `#<TEAM>` (scouting), `#<TEAM>/predictions`. The "Want a one-pager?" box shows only when the team's report exists (checked with HEAD).
+A home-page logo opens `scout.html?for=<TEAM>#<TEAM>/attack`: the team's attack plan (its offense vs this week's defense: where to attack, who to target, coverage); player trends for props are on the Predictions tab, under the star picks (1-5 stars on W2's side and total and on pulled prop lines, with the record by star level). `?for=` makes the scout page the fan's (brand, "Your team", a link back to the attack plan); without it the page is the Bears', as before. Tabs: `#<TEAM>/attack`, `#<TEAM>` (scouting), `#<TEAM>/predictions`. The "Want a one-pager?" box shows only when the team's report exists (checked with HEAD).
 
 The weekly Action commits `reports/`, `data/`, `notes/drafts/` and `index.html` to `main`, then deploys this folder. Runs from other branches or for another team upload reports as a workflow artifact and publish nothing.

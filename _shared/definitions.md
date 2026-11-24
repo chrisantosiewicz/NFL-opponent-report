@@ -85,6 +85,21 @@ Implemented in `sql/models/23_defense_splits.sql` (adjusted columns) and `sql/mo
 | Net points | For a call graded on EPA (early-down soft/stout, the position they cover worst, red-zone throws): our EPA in that part of the game minus what our offense usually gets on the same number of plays. "Usually" = our season to date before the game in that situation, blended with 30 plays of league average. |
 | No real impact | Net points within 1.5 either way. Shown, but counted neither right nor wrong. One big play can still decide a call. Chosen over 2 because calls landing between 1.5 and 2 were right as often as the rest (2025: 13 of 23, 57%), so a wider line only discards graded calls. Reassess after the 2026 season. |
 
+## Pick stars (added Nov 24, 2026)
+
+Implemented in `sql/models/39_pick_stars.sql` (W2's side and total) and `40_prop_stars.sql` (player props, from `config/prop_lines.csv`). Untested: the cutoffs are a first guess, to be checked against the record by star level.
+
+| Item | Definition |
+|------|-----------|
+| Pick | Spread: the side W2 likes against the line. Total: over or under, from W2's total vs the line. Prop: over or under, from the player's projection (half season average, half last-4 average, per game played) vs the line. Only games W2 has run; only props for players in `player_trends`. |
+| Points | gap + agreement + support + risk. Stars: 1 point or fewer = 1, 2 = 2, 3-4 = 3, 5-6 = 4, 7+ = 5. |
+| Gap | Spread (0-4): W2's margin, stretched to the market's spread for the week's slate (W2's margins are compressed; 8+ games, stretch 1-2x), minus the market's margin: under 1.5 = 0, 1.5-2.5 = 1, 2.5-3.5 = 2, 3.5-5 = 3, 5+ = 4. Total (0-2): W2's total minus the line: under 3 = 0, 3-6 = 1, 6+ = 2 (W2's totals bunch at 41-49, so a total needs outside support). Prop (0-4): projection vs the line as a share of the line: under 5% = 0, 5-10% = 1, 10-15% = 2, 15-25% = 3, 25%+ = 4. |
+| Agreement | Spread: Elo's margin 1+ point past the line the same way (+1) or the other way (-1); Elo never picks (no ATS signal in Chris's backtest). Total: none. Prop: season and last-4 averages both on the pick's side (+1) or on opposite sides (-1). |
+| Support (0-2) | +1 each, at most 2. Spread: the picked team's season cover rate 25+ points above the opponent's (4+ decided games each); its net yards per game 50+ better. Total: both teams over (under) in 60%+ of games (4+ each); wind or rain for an under; both offenses and both defenses in the top (bottom) half for yards. Prop: the defense in the top (over) or bottom (under) quarter for yards allowed to that stat; W2's game script (total 47+ / 41 or less for passing and receiving, his team winning / losing by 3+ for rushing); wind or rain for a passing or receiving under. |
+| Risk (-2 to 0) | Spread: the picked team's starting QB out or doubtful (-2), or 2+ other starters (-1). Total: outdoor game with no forecast yet, an over in wind or rain, an over with a starting QB out (-1 each). Prop: out or doubtful (-2), questionable (-1), fewer than 4 games (-1), a passing or receiving over in wind or rain (-1). |
+| Lock and grade | Spread and total picks ride with W2's call in `predictions-<season>.json` (`w2_spread_*`, `w2_total_*`): the last run before kickoff is kept and graded W/L/P against the line it was made at. The page shows the record by star level. Props are not graded yet. |
+| Prop lines | The Odds API, pulled on the laptop with the betting repo's key and credit budget (the key stays on the laptop); only the median line across books is kept, never prices. |
+
 ## Trades during the season
 
 nflverse's trade feed can lag by months (on Oct 30, 2026 its newest trade was from April), so the check has two other sources:

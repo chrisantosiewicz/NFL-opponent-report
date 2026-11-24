@@ -32,8 +32,12 @@ COPY (
     -- number in the file is final and never rewritten. raw_w2_locks holds the
     -- ones already in the file. w2_locked_at changes only when the number does.
     w2_open AS (
-        SELECT w.*
+        SELECT w.*,
+               ps.pick_team AS w2_spread_pick, ps.pick_line AS w2_spread_line, ps.stars AS w2_spread_stars,
+               pt.pick_total AS w2_total_pick, pt.pick_line AS w2_total_line, pt.stars AS w2_total_stars
         FROM w2_predictions w
+        LEFT JOIN pick_stars ps ON ps.game_id = w.game_id AND ps.market = 'spread'
+        LEFT JOIN pick_stars pt ON pt.game_id = w.game_id AND pt.market = 'total'
         WHERE w.season = {{season}} AND w.week = {{week}}
           AND w.gameday >= DATE '{{run_date}}'
           AND w.game_id NOT IN (
@@ -51,7 +55,9 @@ COPY (
                          AND round(r.w2_home_win, 4) = round(o.w2_home_win, 4)
                          AND round(r.w2_home_margin, 2) = round(o.w2_home_margin, 2)
                          AND round(r.w2_total, 2) = round(o.w2_total, 2)
-                    THEN r.w2_locked_at ELSE '{{updated}}' END AS w2_locked_at
+                    THEN r.w2_locked_at ELSE '{{updated}}' END AS w2_locked_at,
+               o.w2_spread_pick, o.w2_spread_line, o.w2_spread_stars,
+               o.w2_total_pick, o.w2_total_line, o.w2_total_stars
         FROM w2_open o
         LEFT JOIN raw_w2_locks r USING (game_id)
     ),
@@ -76,7 +82,19 @@ COPY (
             CASE WHEN m.result IS NULL OR m.result = 0 OR w.w2_home_win IS NULL THEN NULL
                  ELSE (w.w2_home_win > 0.5) = (m.result > 0) END AS w2_correct,
             CASE WHEN m.result IS NULL OR m.result = 0 OR w.w2_home_win IS NULL THEN NULL
-                 ELSE round(-ln(CASE WHEN m.result > 0 THEN w.w2_home_win ELSE 1 - w.w2_home_win END), 4) END AS w2_log_loss
+                 ELSE round(-ln(CASE WHEN m.result > 0 THEN w.w2_home_win ELSE 1 - w.w2_home_win END), 4) END AS w2_log_loss,
+            -- Star picks (39_pick_stars.sql), kept with W2's call and graded
+            -- against the line they were made at: W(in), L(oss) or P(ush).
+            w.w2_spread_pick, w.w2_spread_line, w.w2_spread_stars,
+            CASE WHEN m.result IS NULL OR w.w2_spread_pick IS NULL THEN NULL
+                 WHEN (CASE WHEN w.w2_spread_pick = m.home_team THEN m.result ELSE -m.result END) + w.w2_spread_line > 0 THEN 'W'
+                 WHEN (CASE WHEN w.w2_spread_pick = m.home_team THEN m.result ELSE -m.result END) + w.w2_spread_line < 0 THEN 'L'
+                 ELSE 'P' END AS w2_spread_result,
+            w.w2_total_pick, w.w2_total_line, w.w2_total_stars,
+            CASE WHEN m.total_points IS NULL OR w.w2_total_pick IS NULL OR NOT m.is_complete THEN NULL
+                 WHEN m.total_points = w.w2_total_line THEN 'P'
+                 WHEN (m.total_points > w.w2_total_line) = (w.w2_total_pick = 'over') THEN 'W'
+                 ELSE 'L' END AS w2_total_result
         FROM locks l
         JOIN stg_market_lines m USING (game_id)
         LEFT JOIN w2_locks w USING (game_id)

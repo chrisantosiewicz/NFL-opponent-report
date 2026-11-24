@@ -76,6 +76,27 @@ COPY (
          LEFT JOIN w2_predictions w USING (game_id)
          WHERE p.season = {{season}} AND p.week = {{week}})   AS lines,
 
+        -- 1-5 star score on W2's side and total for each game (39_pick_stars.sql).
+        (SELECT list({game_id: game_id, market: market, pick_team: pick_team,
+                      pick_total: pick_total, pick_line: pick_line, pick_label: pick_label,
+                      gap: gap, gap_pts: gap_pts, elo_pts: elo_pts,
+                      support_pts: support_pts, risk_pts: risk_pts,
+                      points: points, stars: stars, reasons: reasons}
+                     ORDER BY stars DESC, points DESC, gap DESC, game_id, market)
+         FROM pick_stars
+         WHERE season = {{season}} AND week = {{week}})   AS picks,
+
+        -- 1-5 star score on each player prop line pulled this week (40_prop_stars.sql).
+        (SELECT list({game_id: game_id, team: team, player: player, position: position,
+                      market: market, line: line, books: books, fetched_at: fetched_at,
+                      pick: pick, pick_label: pick_label, season_avg: season_avg,
+                      last4_avg: last4_avg, projection: projection,
+                      gap_pts: gap_pts, agree_pts: agree_pts, support_pts: support_pts,
+                      risk_pts: risk_pts, points: points, stars: stars, reasons: reasons}
+                     ORDER BY stars DESC, points DESC, gap_share DESC, game_id, player, market)
+         FROM prop_stars
+         WHERE season = {{season}} AND week = {{week}})   AS prop_picks,
+
         -- Records against past closing lines, every team, both windows
         -- (34_betting_trends.sql). Games before this week only.
         (SELECT list({team: team, span: span, split: split, games: games,
