@@ -199,29 +199,11 @@ c_lean AS (
     GROUP BY m.season, m.week, m.team, sp.share, sp.bucket, sp.bucket_type, sp.league_share
 ),
 
--- 6. 3rd & long -----------------------------------------------------------------
-third AS (
-    SELECT season, as_of_week AS week, team,
-           MAX(n) FILTER (WHERE situation = 'third_long' AND metric = 'pass_rate') * 1.0
-             / NULLIF(SUM(n) FILTER (WHERE situation IN ('third_short', 'third_medium', 'third_long') AND metric = 'pass_rate'), 0) AS long_share
-    FROM tendency_ranks WHERE span = 'season'
-    GROUP BY ALL
-),
-
-c_third AS (
-    SELECT m.season, m.week, m.team, 7, 'defense', 'tendency', 'Third-down distance',
-        concat(note_pct(t.long_share), ' of third downs 7+ to go (league ', note_pct(lg.lg), ')'),
-        concat(g.long_n, ' of ', g.n, ' were 7+, ', g.conv, ' converted'),
-        CASE WHEN g.n < 4 THEN 'Didn''t come up'
-             WHEN (t.long_share > lg.lg) = (g.long_n * 1.0 / g.n > lg.lg) THEN 'Hit' ELSE 'Miss' END
-    FROM m
-    JOIN third t USING (season, week, team)
-    JOIN (SELECT season, week, AVG(long_share) AS lg FROM third GROUP BY ALL) lg USING (season, week)
-    JOIN (SELECT season, week, team, COUNT(*) AS n, COUNT(*) FILTER (WHERE ydstogo >= 7) AS long_n,
-                 COUNT(*) FILTER (WHERE yards_gained >= ydstogo) AS conv
-          FROM theirs WHERE down = 3 GROUP BY ALL) g USING (season, week, team)
-    WHERE abs(t.long_share - lg.lg) >= 0.05
-),
+-- 6. 3rd & long: dropped Nov 24, 2026. How often a team faces 3rd & 7+ follows
+-- from its early downs that week, not a habit: split-half correlation about 0 in
+-- 2025-26, 54% right in 2026, and calls 10+ points off the league went 36-36.
+-- Third-and-long conversion rate and the 3rd & 7+ top target were tested as
+-- replacements and didn't hold either. Call number 7 stays unused.
 
 -- 7. Hot spot (warning) --------------------------------------------------------
 c_hot AS (
@@ -396,7 +378,7 @@ qb_change AS (
 
 calls AS (
     SELECT * FROM c_identity UNION ALL SELECT * FROM c_works UNION ALL SELECT * FROM c_target
-    UNION ALL SELECT * FROM c_lean UNION ALL SELECT * FROM c_third UNION ALL SELECT * FROM c_hot
+    UNION ALL SELECT * FROM c_lean UNION ALL SELECT * FROM c_hot
     UNION ALL SELECT * FROM c_late UNION ALL SELECT * FROM c_defense UNION ALL SELECT * FROM c_position
     UNION ALL SELECT * FROM c_lanes UNION ALL SELECT * FROM c_redzone
 )
