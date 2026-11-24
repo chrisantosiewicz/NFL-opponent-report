@@ -76,13 +76,13 @@ COPY (
          LEFT JOIN w2_predictions w USING (game_id)
          WHERE p.season = {{season}} AND p.week = {{week}})   AS lines,
 
-        -- 1-5 star score on W2's side and total for each game (39_pick_stars.sql).
+        -- W2's side (unrated lean) and total (1-5 stars) for each game (39_pick_stars.sql).
         (SELECT list({game_id: game_id, market: market, pick_team: pick_team,
                       pick_total: pick_total, pick_line: pick_line, pick_label: pick_label,
-                      gap: gap, gap_pts: gap_pts, elo_pts: elo_pts,
+                      gap: gap, gap_pts: gap_pts,
                       support_pts: support_pts, risk_pts: risk_pts,
                       points: points, stars: stars, reasons: reasons}
-                     ORDER BY stars DESC, points DESC, gap DESC, game_id, market)
+                     ORDER BY stars DESC NULLS LAST, gap DESC, game_id, market)
          FROM pick_stars
          WHERE season = {{season}} AND week = {{week}})   AS picks,
 
