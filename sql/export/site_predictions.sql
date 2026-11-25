@@ -33,10 +33,10 @@ COPY (
     -- ones already in the file. w2_locked_at changes only when the number does.
     w2_open AS (
         SELECT w.*,
-               ps.pick_team AS w2_spread_pick, ps.pick_line AS w2_spread_line, ps.stars AS w2_spread_stars,
+               ps.pick_team AS w2_ml_pick, ps.pick_line AS w2_ml_price, ps.hit_chance AS w2_ml_chance, ps.stars AS w2_ml_stars,
                pt.pick_total AS w2_total_pick, pt.pick_line AS w2_total_line, pt.stars AS w2_total_stars
         FROM w2_predictions w
-        LEFT JOIN pick_stars ps ON ps.game_id = w.game_id AND ps.market = 'spread'
+        LEFT JOIN pick_stars ps ON ps.game_id = w.game_id AND ps.market = 'moneyline'
         LEFT JOIN pick_stars pt ON pt.game_id = w.game_id AND pt.market = 'total'
         WHERE w.season = {{season}} AND w.week = {{week}} AND NOT w.is_backfill
           AND w.gameday >= DATE '{{run_date}}'
@@ -56,7 +56,7 @@ COPY (
                          AND round(r.w2_home_margin, 2) = round(o.w2_home_margin, 2)
                          AND round(r.w2_total, 2) = round(o.w2_total, 2)
                     THEN r.w2_locked_at ELSE '{{updated}}' END AS w2_locked_at,
-               o.w2_spread_pick, o.w2_spread_line, o.w2_spread_stars,
+               o.w2_ml_pick, o.w2_ml_price, o.w2_ml_chance, o.w2_ml_stars,
                o.w2_total_pick, o.w2_total_line, o.w2_total_stars
         FROM w2_open o
         LEFT JOIN raw_w2_locks r USING (game_id)
@@ -85,11 +85,11 @@ COPY (
                  ELSE round(-ln(CASE WHEN m.result > 0 THEN w.w2_home_win ELSE 1 - w.w2_home_win END), 4) END AS w2_log_loss,
             -- Star picks (39_pick_stars.sql), kept with W2's call and graded
             -- against the line they were made at: W(in), L(oss) or P(ush).
-            w.w2_spread_pick, w.w2_spread_line, w.w2_spread_stars,
-            CASE WHEN m.result IS NULL OR w.w2_spread_pick IS NULL THEN NULL
-                 WHEN (CASE WHEN w.w2_spread_pick = m.home_team THEN m.result ELSE -m.result END) + w.w2_spread_line > 0 THEN 'W'
-                 WHEN (CASE WHEN w.w2_spread_pick = m.home_team THEN m.result ELSE -m.result END) + w.w2_spread_line < 0 THEN 'L'
-                 ELSE 'P' END AS w2_spread_result,
+            w.w2_ml_pick, w.w2_ml_price, w.w2_ml_chance, w.w2_ml_stars,
+            CASE WHEN m.result IS NULL OR NOT m.is_complete OR w.w2_ml_pick IS NULL THEN NULL
+                 WHEN m.result = 0 THEN 'P'
+                 WHEN (m.result > 0) = (w.w2_ml_pick = m.home_team) THEN 'W'
+                 ELSE 'L' END AS w2_ml_result,
             w.w2_total_pick, w.w2_total_line, w.w2_total_stars,
             CASE WHEN m.total_points IS NULL OR w.w2_total_pick IS NULL OR NOT m.is_complete THEN NULL
                  WHEN m.total_points = w.w2_total_line THEN 'P'
@@ -112,12 +112,12 @@ COPY (
         -- out fresh each run from 39_pick_stars.sql and graded against the
         -- closing line; shown apart from the locked record.
         (SELECT list({week: b.week, game_id: b.game_id, market: b.market, pick_label: b.pick_label,
-                      stars: b.stars, gap: b.gap, w2_run: CASE WHEN b.is_backfill THEN 'after the fact' ELSE 'live' END,
+                      stars: b.stars, hit_chance: b.hit_chance, gap: b.gap, w2_run: CASE WHEN b.is_backfill THEN 'after the fact' ELSE 'live' END,
                       result: CASE
-                          WHEN b.market = 'spread' THEN CASE
-                              WHEN (CASE WHEN b.pick_team = m.home_team THEN m.result ELSE -m.result END) + b.pick_line > 0 THEN 'W'
-                              WHEN (CASE WHEN b.pick_team = m.home_team THEN m.result ELSE -m.result END) + b.pick_line < 0 THEN 'L'
-                              ELSE 'P' END
+                          WHEN b.market = 'moneyline' THEN CASE
+                              WHEN m.result = 0 THEN 'P'
+                              WHEN (m.result > 0) = (b.pick_team = m.home_team) THEN 'W'
+                              ELSE 'L' END
                           WHEN m.total_points = b.pick_line THEN 'P'
                           WHEN (m.total_points > b.pick_line) = (b.pick_total = 'over') THEN 'W'
                           ELSE 'L' END}
@@ -125,5 +125,5 @@ COPY (
          FROM pick_stars b
          JOIN stg_market_lines m USING (game_id)
          WHERE b.season = {{season}} AND m.is_complete
-           AND b.game_id NOT IN (SELECT game_id FROM graded WHERE w2_spread_pick IS NOT NULL)) AS backfill
+           AND b.game_id NOT IN (SELECT game_id FROM graded WHERE w2_ml_pick IS NOT NULL OR w2_total_pick IS NOT NULL)) AS backfill
 ) TO '{{path}}' (FORMAT JSON);

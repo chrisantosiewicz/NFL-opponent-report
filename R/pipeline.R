@@ -465,14 +465,14 @@ export_predictions <- function(con, season, week, run_date, site_dir = "site") {
   # The star picks (39_pick_stars.sql) ride along; files written before them have none.
   dbExecute(con, "CREATE OR REPLACE TABLE raw_w2_locks (game_id VARCHAR, w2_home_win DOUBLE,
     w2_home_margin DOUBLE, w2_total DOUBLE, w2_fit_run_id VARCHAR, w2_locked_at VARCHAR,
-    w2_spread_pick VARCHAR, w2_spread_line DOUBLE, w2_spread_stars INTEGER,
+    w2_ml_pick VARCHAR, w2_ml_price DOUBLE, w2_ml_chance DOUBLE, w2_ml_stars INTEGER,
     w2_total_pick VARCHAR, w2_total_line DOUBLE, w2_total_stars INTEGER)")
   if (file.exists(path)) {
     has_w2 <- tryCatch(nrow(dbGetQuery(con, sprintf("SELECT 1 FROM (SELECT unnest(games) AS g FROM read_json('%s'))
       WHERE g.w2_home_win IS NOT NULL LIMIT 1", path))) > 0, error = function(e) FALSE)
     if (has_w2) dbExecute(con, sprintf("INSERT INTO raw_w2_locks BY NAME
       SELECT COLUMNS(lambda c: c IN ('game_id', 'w2_home_win', 'w2_home_margin', 'w2_total', 'w2_fit_run_id',
-                                'w2_locked_at', 'w2_spread_pick', 'w2_spread_line', 'w2_spread_stars',
+                                'w2_locked_at', 'w2_ml_pick', 'w2_ml_price', 'w2_ml_chance', 'w2_ml_stars',
                                 'w2_total_pick', 'w2_total_line', 'w2_total_stars'))
       FROM (SELECT unnest(games, recursive := true) FROM read_json('%s'))
       WHERE w2_home_win IS NOT NULL", path))
