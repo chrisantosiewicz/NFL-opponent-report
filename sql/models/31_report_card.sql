@@ -22,6 +22,12 @@
 -- 2026; reassess at season's end); one big play
 -- can still decide it. (Changed Nov 24, 2026.)
 -- Didn't come up = too few plays in the game to say (thresholds below).
+-- Warnings need only one play: a threat or soft spot is about what a play
+-- does, and one 19-yard, +0.91 EPA throw into their hot spot is the threat
+-- showing up, not "didn't come up". Net-point grades already absorb small
+-- samples (a single play rarely moves 1.5 points). (Changed Nov 25, 2026:
+-- the hot spot needed 2 throws, red-zone and position calls 3 plays, which
+-- hid 1-2 play results of up to 4 points.)
 -- Calls with no clear lean that week are left out, as they are in the notes.
 -- Week 1 is scouted from last season's full regular season (basis =
 -- 'last_season'), so its grades are kept apart from the in-season rates.
@@ -211,9 +217,9 @@ c_hot AS (
         concat(upper(note_area(sp.bucket, sp.most_often)[1]), note_area(sp.bucket, sp.most_often)[2:], ': ', note_yds(sp.yards_per_play), ' yards and ',
                note_epa(sp.epa_per_play), ' EPA per throw'),
         CASE WHEN COUNT(t.play_id) = 0 THEN 'No throws there'
-             ELSE concat(COUNT(t.play_id), ' throws, ', CAST(SUM(t.yards_gained) AS INTEGER), ' yards, ',
-                         note_epa(AVG(t.epa)), ' EPA each') END,
-        CASE WHEN COUNT(t.play_id) < 2 THEN 'Didn''t come up'
+             ELSE concat(COUNT(t.play_id), CASE WHEN COUNT(t.play_id) = 1 THEN ' throw, ' ELSE ' throws, ' END, CAST(SUM(t.yards_gained) AS INTEGER), ' yards, ',
+                         note_epa(AVG(t.epa)), CASE WHEN COUNT(t.play_id) = 1 THEN ' EPA' ELSE ' EPA each' END) END,
+        CASE WHEN COUNT(t.play_id) = 0 THEN 'Didn''t come up'
              WHEN AVG(t.epa) > sp.league_epa THEN 'Called it' ELSE 'Held' END
     FROM m
     JOIN scout_picks sp ON sp.season = m.season AND sp.week = m.week AND sp.team = m.team AND sp.pick = 'hot_spot'
@@ -280,10 +286,10 @@ c_defense AS (
 c_position AS (
     SELECT m.season, m.week, m.team, 12, 'offense', 'warning', concat('Target their coverage of ', note_pos(v.position)),
         concat(note_epa(v.epa_per_target), ' EPA per target allowed (', note_most(v.rank_allowed, v.teams), ')'),
-        concat(COUNT(o.play_id), ' targets, ', CAST(COALESCE(SUM(o.yards_gained), 0) AS INTEGER), ' yards, ',
+        concat(COUNT(o.play_id), CASE WHEN COUNT(o.play_id) = 1 THEN ' target, ' ELSE ' targets, ' END, CAST(COALESCE(SUM(o.yards_gained), 0) AS INTEGER), ' yards, ',
                note_epa(COALESCE(SUM(o.epa), 0)), ' EPA, ',
                note_net(net_points(COALESCE(SUM(o.epa), 0), COUNT(o.play_id), ANY_VALUE(pr.sum_epa), ANY_VALUE(pr.n), v.league_epa_per_target))),
-        CASE WHEN COUNT(o.play_id) < 3 THEN 'Didn''t come up'
+        CASE WHEN COUNT(o.play_id) = 0 THEN 'Didn''t come up'
              ELSE net_verdict(net_points(COALESCE(SUM(o.epa), 0), COUNT(o.play_id), ANY_VALUE(pr.sum_epa), ANY_VALUE(pr.n),
                                          v.league_epa_per_target), true) END
     FROM m
@@ -336,9 +342,10 @@ c_redzone AS (
     SELECT m.season, m.week, m.team, 14, 'offense', 'warning', 'Throw it in the red zone',
         concat(note_epa(d.epa_allowed), ' per dropback allowed inside the 20 (', note_most(d.rank_allowed, d.teams), ')'),
         CASE WHEN g.n IS NULL THEN 'No red-zone dropbacks'
-             ELSE concat(g.n, ' dropbacks, ', note_epa(g.epa), ' EPA each, ', g.td, ' TD, ',
+             ELSE concat(g.n, CASE WHEN g.n = 1 THEN ' dropback, ' ELSE ' dropbacks, ' END,
+                         note_epa(g.epa), CASE WHEN g.n = 1 THEN ' EPA, ' ELSE ' EPA each, ' END, g.td, ' TD, ',
                          note_net(net_points(g.sum_epa, g.n, pr.sum_epa, pr.n, d.league_epa))) END,
-        CASE WHEN COALESCE(g.n, 0) < 3 THEN 'Didn''t come up'
+        CASE WHEN g.n IS NULL THEN 'Didn''t come up'
              ELSE net_verdict(net_points(g.sum_epa, g.n, pr.sum_epa, pr.n, d.league_epa), true) END
     FROM m
     JOIN ds d ON d.season = m.season AND d.week = m.week AND d.team = m.team AND d.situation = 'red_zone'
