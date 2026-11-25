@@ -141,6 +141,13 @@ nav.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--
 .wp .lab b { font-family: var(--mono); font-weight: 500; }
 .wp .bar2 { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--rule); }
 .wp .bar2 span { display: block; height: 100%; }
+.stars { color: var(--accent); letter-spacing: 1px; font-size: 15px; white-space: nowrap; }
+.stars .off { color: var(--dot); }
+.picks { display: grid; gap: 8px; }
+.pick { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; border-top: 1px solid var(--rule); padding-top: 8px; }
+.pick:first-child { border-top: 0; padding-top: 0; }
+.pick .why { font-size: 12px; color: var(--muted); }
+table.starrec td, table.starrec th { padding: 2px 10px 2px 0; text-align: left; font-size: 13px; }
 .est { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--warn); }
 table.h2h { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 table.h2h th, table.h2h td { padding: 6px 8px; border-top: 1px solid var(--rule); text-align: right; white-space: nowrap; }
@@ -223,7 +230,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
 <main class="wrap" id="app"><p class="empty">Loading this week's numbers…</p></main>
 
 <footer class="wrap">
-  <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. Win chances are model estimates, shown next to the market's chance from the moneylines with the bookmaker's margin removed. W2 is the newest model: a ridge-regression model (M6) plus the game-day rain and wind forecast, trained on 2017-2024 games; its lines ("My model's lines", under Current lines) are its predicted margin and total points, rounded to the half point. Elo is the original: every team's strength, updated after each game, with home field and rest after a bye. Neither is a pick against the spread or the total. Trend records count each game against its closing line. Player trends come from the play-by-play, so they can differ slightly from official box scores; per-game averages use the games the player played. They are trends next to what the defense allows, not prop picks: there are no prop lines here. Only games before this week are used.</p>
+  <p id="how-preds" hidden><strong>How to read this.</strong> Lines and records come from nflverse schedules. A spread is shown from each team's side, favorite negative. Win chances are model estimates, shown next to the market's chance from the moneylines with the bookmaker's margin removed. W2 is the newest model: a ridge-regression model (M6) plus the game-day rain and wind forecast, trained on 2017-2024 games; its lines ("My model's lines", under Current lines) are its predicted margin and total points, rounded to the half point. Elo is the original: every team's strength, updated after each game, with home field and rest after a bye. Star picks rate how likely each pick is to hit, from 1 to 5 stars: the moneyline pick by the average of W2's and the market's win chance, the total by how far W2's total is from the line (6+ points went 58% in W2's 2019-2024 out-of-sample predictions) plus wind or rain. Each pick also lists both teams' offense and defense ranks. Prop leans use the player's averages vs the line, the matchup, W2's game script and injury risk; they are unrated until the pulled lines have been graded long enough to test them. All picks are graded as results come in. Trend records count each game against its closing line. Player trends come from the play-by-play, so they can differ slightly from official box scores; per-game averages use the games the player played. They are trends next to what the defense allows; prop lines, when pulled, are shown as leans under Star picks. Only games before this week are used.</p>
   <p id="how-attack" hidden><strong>How to read this.</strong> The attack plan puts one offense next to the defense it faces this week. Run sides and pass areas are from the offense's view (left, middle, right of the offense) on both sides, using neutral downs (win probability 5-95%). A defense's rank of 1 means it allows the most EPA per play there; "soft spot" is the worst quarter of the league, "tough" the best quarter. Blitz, box and play action are this season's FTN charting; man/zone is last season's, the latest public. Only games before this week are used.</p>
   <p id="how-scout"><strong>How to read this.</strong> Every dot is one NFL team, ranked on the same plays. The big dot is the team you picked, the dark line is the league average. Pass rate counts sacks and scrambles as passes. Pass rate over expected compares their pass rate with what an average team calls in the same down, distance, field position, score and time (nflverse xpass model). EPA is expected points added per play; above 0 helps the offense. Early downs, 3rd down, red zone and all neutral use only plays with the offense's win probability between 5% and 95%; 2-minute and trailing by 8+ use every play. Numbers on fewer than 30 plays are greyed and marked * and never make "What stands out". Only games before this week are used.</p>
   <p id="foot-meta"></p>
@@ -594,7 +601,57 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
         <p class="muted" style="margin:6px 0 0">Share of games that went over the total.</p></article></section>`;
     const disc = `<p class="disclaimer">Model estimates are for information only and are not betting advice. Must be 21+ to bet where legal. Gambling problem? Call 1-800-GAMBLER.</p>`;
     const extra = game ? `<section class="lead">${injuryBox(d, info, { compact: true })}${injuryBox(d, opp, { compact: true })}</section><div style="margin-bottom:12px">${weatherBox(d, game, team)}</div>` : "";
-    return top + extra + trends + strips + propsHtml(d, team, info, game) + disc;
+    return top + starsHtml(d, team, info, game, preds) + extra + trends + strips + propsHtml(d, team, info, game) + disc;
+  }
+  // ---- Star picks: 1-5 stars on W2's moneyline and total, by how likely each is to hit (39 model); prop leans (40).
+  const starTxt = n => `<span class="stars" aria-label="${n} of 5 stars">${"★".repeat(n)}<span class="off">${"★".repeat(5 - n)}</span></span>`;
+  const pickRow = (label, n, reasons) => `<div class="pick"><div><b>${esc(label)}</b><div class="why">${(reasons || []).map(esc).join(" · ")}</div></div>${n ? starTxt(n)
+      : `<span class="est" title="Not tested yet; graded so it can earn stars">Unrated lean</span>`}</div>`;
+  const recCell = t => { if (!t) return "–"; const dec = t.W + t.L; return `${t.W}-${t.L}${t.P ? "-" + t.P : ""}${dec ? ` (${Math.round(100 * t.W / dec)}%)` : ""}`; };
+  function addTally(tally, market, stars, res) {
+    if (!res || !stars) return;
+    const m = tally[market] || (tally[market] = {}), t = m[stars] || (m[stars] = { W: 0, L: 0, P: 0 }); t[res]++;
+  }
+  function tallyTable(tally, note) {
+    const rows = [5, 4, 3, 2, 1].filter(n => (tally.moneyline || {})[n] || (tally.total || {})[n]);
+    return `<table class="starrec" style="margin-top:10px"><thead><tr><th>Stars</th><th>Moneyline</th><th>Totals</th></tr></thead><tbody>${rows.map(n =>
+      `<tr><td>${starTxt(n)}</td><td>${recCell((tally.moneyline || {})[n])}</td><td>${recCell((tally.total || {})[n])}</td></tr>`).join("")}</tbody></table>
+      <p class="muted" style="margin:6px 0 0">${note}</p>`;
+  }
+  function backfillRecord(preds) {
+    const b = (preds && preds.backfill) || [];
+    if (!b.length) return "";
+    const tally = {};
+    for (const r of b) addTally(tally, r.market, r.stars, r.result);
+    const weeks = [...new Set(b.map(r => r.week))].sort((x, y) => x - y);
+    return `<h2 style="margin-top:16px">Backfilled, weeks ${weeks[0]}${weeks.length > 1 ? "-" + weeks[weeks.length - 1] : ""}</h2>` +
+      tallyTable(tally, "Stars worked out after the games from W2's numbers (run after the fact, with the actual kickoff weather, for weeks before W2 went live), graded against closing lines. A check on the method, not picks anyone could have made.");
+  }
+  function starRecord(preds) {
+    if (!preds || !preds.games) return "";
+    const tally = {};
+    for (const g of preds.games) { addTally(tally, "moneyline", g.w2_ml_stars, g.w2_ml_result); addTally(tally, "total", g.w2_total_stars, g.w2_total_result); }
+    if (!tally.moneyline && !tally.total) return `<p class="muted" style="margin:10px 0 0">No graded star picks locked before kickoff yet. Each pick is kept as it stood at kickoff and graded against that line, so this record builds week by week.</p>${backfillRecord(preds)}`;
+    return tallyTable(tally, "Locked before kickoff, graded against the line at kickoff. A moneyline pick wins if the team wins; a total at −110 needs 52.4% to break even.") + backfillRecord(preds);
+  }
+  function starsHtml(d, team, info, game, preds) {
+    if (!d.picks && !d.prop_picks) return "";
+    const gid = game ? ((d.lines || []).find(l => (l.home_team === team && l.away_team === game.opponent) || (l.away_team === team && l.home_team === game.opponent)) || {}).game_id : null;
+    const mine = (d.picks || []).filter(p => p.game_id === gid).sort((a, b) => a.market.localeCompare(b.market));
+    const props = (d.prop_picks || []).filter(p => p.game_id === gid).slice().sort((a, b) => b.points - a.points).slice(0, 8);
+    const best = (d.picks || []).filter(p => p.stars >= 3).slice().sort((a, b) => b.stars - a.stars || b.hit_chance - a.hit_chance).slice(0, 6);
+    const gameName = id => { const l = (d.lines || []).find(x => x.game_id === id); return l ? `${l.away_team} @ ${l.home_team}` : ""; };
+    const thisGame = !game ? "" : !gid || !mine.length ? `<p class="muted">No star picks for this game yet: they need W2's numbers and the market's lines.</p>`
+      : `<div class="picks">${mine.map(p => pickRow(p.pick_label, p.stars, p.reasons)).join("")}</div>`;
+    const propBlock = !game ? "" : props.length ? `<h2 style="margin-top:16px">Player prop leans</h2><div class="picks">${props.map(p => pickRow(`${p.player} ${p.pick_label}`, p.stars, p.reasons)).join("")}</div>`
+      : `<p class="muted" style="margin:12px 0 0">No prop lines for this game yet. They're pulled Thursday morning (Thursday and Friday games) and Saturday morning.</p>`;
+    const league = best.length ? `<div class="box"><h2>Top-rated this week</h2><div class="picks">
+        ${best.map(p => pickRow(`${p.pick_label} · ${gameName(p.game_id)}`, p.stars, p.reasons)).join("")}</div>
+        ${starRecord(preds)}</div>` : `<div class="box"><h2>Star record</h2>${starRecord(preds)}</div>`;
+    return `<section class="lead">
+      <div class="box"><h2>Star picks <span class="est" style="margin-left:6px">New</span></h2>${thisGame}${propBlock}
+        <p class="muted" style="margin:10px 0 0">Stars say how likely a pick is to hit. Moneyline: the team W2 and the market together think wins, starred by that chance (1★ under 60%, 2★ 60-67%, 3★ 67-75%, 4★ 75-83%, 5★ 83%+); this season the 2★ picks won 71% and 3★ 78%. The price is shown because a likely winner can pay little. Totals: most are close to a coin flip (1★); W2 6-9 points off the line is 3★ and 9+ is 4★ (those went 58% in 2019-2024 tests), with one more for wind or rain backing an under. Matchup ranks are EPA per play this season (defense 1 = allows the least). Props are unrated leans until enough lines are graded to test them.</p></div>
+      ${league}</section>`;
   }
   function modelRecord(preds) {
     if (!preds || !preds.games) return "";
@@ -793,7 +850,7 @@ table.props td b { font-family: var(--mono); font-weight: 500; }
     players.sort((a, b) => order[a.role] - order[b.role] || a.role_rank - b.role_rank);
     if (!players.length) return "";
     return `<h2 class="sec">${esc(info.nick)} player trends for props</h2>
-      <p class="muted" style="margin:0 0 8px">Per-game averages next to what the ${esc(oppInfo.nick)} allow. Trends only: no prop lines here, and not betting advice. <a href="#${esc(game.opponent)}/predictions" style="color:var(--accent);font-weight:600;text-decoration:none">${esc(oppInfo.nick)} players →</a></p>
+      <p class="muted" style="margin:0 0 8px">Per-game averages next to what the ${esc(oppInfo.nick)} allow. Trends only, not betting advice; prop leans are under Star picks above. <a href="#${esc(game.opponent)}/predictions" style="color:var(--accent);font-weight:600;text-decoration:none">${esc(oppInfo.nick)} players →</a></p>
       <section class="grid">${players.map(p => propCard(d, p, oppInfo)).join("")}</section>`;
   }
 

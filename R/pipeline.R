@@ -150,7 +150,25 @@ load_w2_predictions <- function(con, path = "config/w2_predictions.csv") {
                                 "numeric", "numeric", "numeric", "character", "character"))
   dbWriteTable(con, "raw_w2_predictions", w2, overwrite = TRUE)
   message("raw_w2_predictions: ", nrow(w2), " games")
+  # Backfill (config/w2_backfill.csv): W2 run after the fact for weeks with no
+  # live run, for the backfilled star-pick record only.
+  bf <- read.csv("config/w2_backfill.csv", na.strings = "", comment.char = "#",
+                 colClasses = c("integer", "integer", "character", "character", "character",
+                                "numeric", "numeric", "numeric", "character", "character"))
+  dbWriteTable(con, "raw_w2_backfill", bf, overwrite = TRUE)
+  message("raw_w2_backfill: ", nrow(bf), " games")
   invisible(w2)
+}
+
+# Player prop lines (config/prop_lines.csv), pulled on the laptop by
+# _tools/props_to_csv.py. Header-only until the first pull: an empty table.
+load_prop_lines <- function(con, path = "config/prop_lines.csv") {
+  props <- read.csv(path, na.strings = "", comment.char = "#",
+                    colClasses = c("integer", "integer", "character", "character", "character",
+                                   "numeric", "integer", "character"))
+  dbWriteTable(con, "raw_prop_lines", props, overwrite = TRUE)
+  message("raw_prop_lines: ", nrow(props), " lines")
+  invisible(props)
 }
 
 # Gamebook kickoff weather for 2017-2023, the seasons load_raw_data() doesn't
@@ -444,13 +462,18 @@ export_predictions <- function(con, season, week, run_date, site_dir = "site") {
   }
   # W2's calls are locked the same way, on their own clock (W2 arrived after
   # Elo's week 11 calls were locked). Files written before W2 have no w2 fields.
+  # The star picks (39_pick_stars.sql) ride along; files written before them have none.
   dbExecute(con, "CREATE OR REPLACE TABLE raw_w2_locks (game_id VARCHAR, w2_home_win DOUBLE,
-    w2_home_margin DOUBLE, w2_total DOUBLE, w2_fit_run_id VARCHAR, w2_locked_at VARCHAR)")
+    w2_home_margin DOUBLE, w2_total DOUBLE, w2_fit_run_id VARCHAR, w2_locked_at VARCHAR,
+    w2_ml_pick VARCHAR, w2_ml_price DOUBLE, w2_ml_chance DOUBLE, w2_ml_stars INTEGER,
+    w2_total_pick VARCHAR, w2_total_line DOUBLE, w2_total_stars INTEGER)")
   if (file.exists(path)) {
     has_w2 <- tryCatch(nrow(dbGetQuery(con, sprintf("SELECT 1 FROM (SELECT unnest(games) AS g FROM read_json('%s'))
       WHERE g.w2_home_win IS NOT NULL LIMIT 1", path))) > 0, error = function(e) FALSE)
-    if (has_w2) dbExecute(con, sprintf("INSERT INTO raw_w2_locks
-      SELECT game_id, w2_home_win, w2_home_margin, w2_total, w2_fit_run_id, w2_locked_at
+    if (has_w2) dbExecute(con, sprintf("INSERT INTO raw_w2_locks BY NAME
+      SELECT COLUMNS(lambda c: c IN ('game_id', 'w2_home_win', 'w2_home_margin', 'w2_total', 'w2_fit_run_id',
+                                'w2_locked_at', 'w2_ml_pick', 'w2_ml_price', 'w2_ml_chance', 'w2_ml_stars',
+                                'w2_total_pick', 'w2_total_line', 'w2_total_stars'))
       FROM (SELECT unnest(games, recursive := true) FROM read_json('%s'))
       WHERE w2_home_win IS NOT NULL", path))
   }

@@ -4,6 +4,9 @@ Run on the laptop after `betting predict week`, from this repo's root:
 
     python3 -I _tools/w2_to_csv.py C:/Betting_Algorithm/data/predictions/2026-week11/w2_<run>.json
 
+With --backfill first, writes config/w2_backfill.csv instead (W2 run after the
+fact for weeks with no live run; used only for the backfilled star record).
+
 Each game's row is replaced by the newest run's (rows for other games are
 kept). Only the win chance, the model's margin and total, and the run id are
 copied: no data hashes, no file paths, no cover or over chances.
@@ -15,6 +18,8 @@ import sys
 from pathlib import Path
 
 CSV = Path(__file__).resolve().parent.parent / "config" / "w2_predictions.csv"
+# --backfill: W2 run after the fact for weeks with no live run (star-pick backfill only).
+BACKFILL_CSV = CSV.with_name("w2_backfill.csv")
 COLUMNS = ["season", "week", "game_id", "home_team", "away_team",
            "w2_home_win", "w2_home_margin", "w2_total", "fit_run_id", "run_at"]
 
@@ -47,6 +52,9 @@ def rows_from(path):
 
 
 def main(paths):
+    global CSV
+    if paths and paths[0] == "--backfill":
+        CSV, paths = BACKFILL_CSV, paths[1:]
     if not paths:
         sys.exit(__doc__)
     header, rows = read_existing()

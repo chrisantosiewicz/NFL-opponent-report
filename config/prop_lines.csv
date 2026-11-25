@@ -1,0 +1,7 @@
+# NFL player prop lines from The Odds API, pulled on Chris's laptop with the betting
+# repo's key and credit budget (the key never leaves the laptop). Written by
+# `_tools/props_to_csv.py`; never typed by hand. One row per game x player x market,
+# the newest pull's. Only the line is kept (median across the books quoted), no prices.
+# market: pass_yds | rush_yds | rec_yds | receptions. player: the book's name for him.
+# books: how many books the median is over. fetched_at: when it was pulled (UTC).
+season,week,game_id,player,market,line,books,fetched_at

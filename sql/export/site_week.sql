@@ -73,8 +73,29 @@ COPY (
                       w2_run_at: w.w2_run_at}
                      ORDER BY p.gameday, p.game_id)
          FROM game_predictions p
-         LEFT JOIN w2_predictions w USING (game_id)
+         LEFT JOIN (SELECT * FROM w2_predictions WHERE NOT is_backfill) w USING (game_id)
          WHERE p.season = {{season}} AND p.week = {{week}})   AS lines,
+
+        -- W2's side (unrated lean) and total (1-5 stars) for each game (39_pick_stars.sql).
+        (SELECT list({game_id: game_id, market: market, pick_team: pick_team,
+                      pick_total: pick_total, pick_line: pick_line, pick_label: pick_label,
+                      gap: gap, gap_pts: gap_pts,
+                      support_pts: support_pts, risk_pts: risk_pts,
+                      points: points, stars: stars, reasons: reasons}
+                     ORDER BY stars DESC NULLS LAST, gap DESC, game_id, market)
+         FROM pick_stars
+         WHERE season = {{season}} AND week = {{week}} AND NOT is_backfill)   AS picks,
+
+        -- An unrated lean on each player prop line pulled this week (40_prop_stars.sql).
+        (SELECT list({game_id: game_id, team: team, player: player, position: position,
+                      market: market, line: line, books: books, fetched_at: fetched_at,
+                      pick: pick, pick_label: pick_label, season_avg: season_avg,
+                      last4_avg: last4_avg, projection: projection,
+                      gap_pts: gap_pts, agree_pts: agree_pts, support_pts: support_pts,
+                      risk_pts: risk_pts, points: points, stars: stars, reasons: reasons}
+                     ORDER BY points DESC, gap_share DESC, game_id, player, market)
+         FROM prop_stars
+         WHERE season = {{season}} AND week = {{week}})   AS prop_picks,
 
         -- Records against past closing lines, every team, both windows
         -- (34_betting_trends.sql). Games before this week only.

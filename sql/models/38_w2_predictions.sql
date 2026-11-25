@@ -17,6 +17,14 @@ SELECT
     w.w2_total,
     w.fit_run_id                  AS w2_fit_run_id,
     w.run_at                      AS w2_run_at,
-    'W2'                          AS w2_version
-FROM raw_w2_predictions w
+    'W2'                          AS w2_version,
+    w.is_backfill
+FROM (
+    SELECT *, FALSE AS is_backfill FROM raw_w2_predictions
+    UNION ALL
+    -- config/w2_backfill.csv: weeks W2 never ran live (only for the backfilled
+    -- star-pick record; a live row for the same game wins).
+    SELECT *, TRUE FROM raw_w2_backfill
+    WHERE game_id NOT IN (SELECT game_id FROM raw_w2_predictions)
+) w
 JOIN raw_schedules s ON s.game_id = w.game_id;
