@@ -8,7 +8,7 @@ One job: hold the published reports, the live scout page and the archive.
 | `index.html` | generated from `index_template.html`: "Who's your favorite team?" logo grid, Bears one-pager + archive | `build_site()` |
 | `reports/` | generated Bears one-pagers (the archive) | `render_report()` |
 | `reports/teams/` | generated one-pagers for every other team, this week only | `render_league_reports()` |
-| `data/` | generated JSON, including the locked `predictions-<season>.json` | `../sql/export/` |
+| `data/` | generated JSON, including the locked `predictions-<season>.json` and `report-card-locks-<season>.json` | `../sql/export/` |
 | `notes/drafts/` | generated draft notes | `write_draft_notes()` |
 | `notes/` | staff notes, final | Chris: [contract](notes/CONTEXT.md) |
 

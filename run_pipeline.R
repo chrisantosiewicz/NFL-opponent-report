@@ -30,6 +30,7 @@ if (!isTRUE(arg("skip-load", FALSE))) {
   load_raw_data(con, (season - 2):season)
 }
 load_manual_trades(con)
+load_report_card_locks(con)
 load_stadiums(con)
 load_w2_predictions(con)
 load_gamebook_weather(con)
@@ -39,6 +40,9 @@ if (!isTRUE(arg("skip-load", FALSE)) || !dbExistsTable(con, "raw_weather_hourly"
 build_models(con)
 run_data_tests(con)
 check_league_moves(con, run_date)
+# Lock each upcoming game's report-card calls (update runs too: the last run
+# before kickoff is the one kept).
+export_report_card_locks(con, run_date)
 
 # Update runs (Thursday, Saturday, Sunday and Monday mornings; see
 # .github/workflows/weekly-report.yml) refresh the live page's data for the
