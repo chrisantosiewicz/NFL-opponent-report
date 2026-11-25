@@ -471,6 +471,72 @@ lock_before <- function(run_date) {
   paste(format(as.Date(run_date)), "00:00")
 }
 
+# Report-card locks (site/data/report-card-locks-<season>.json): what each
+# call said before a game, and the pregame numbers its grade uses. Loaded on
+# every run (like the manual trades) so 31_report_card.sql grades a game from
+# its locked rows; written by export_report_card_locks() after the models build.
+REPORT_CARD_LOCK_COLUMNS <- c(
+  season = "INTEGER", week = "INTEGER", team = "VARCHAR", game_id = "VARCHAR", call_no = "INTEGER",
+  side = "VARCHAR", kind = "VARCHAR", call = "VARCHAR", said = "VARCHAR",
+  p_rank = "INTEGER", p_teams = "INTEGER", p_flag = "BOOLEAN", p_id = "VARCHAR", p_name = "VARCHAR",
+  p_bucket = "VARCHAR", p_bucket_type = "VARCHAR", p_bucket2 = "VARCHAR", p_num = "DOUBLE",
+  p_prior_sum = "DOUBLE", p_prior_n = "INTEGER", locked_at = "VARCHAR")
+
+load_report_card_locks <- function(con, site_dir = "site") {
+  files <- sort(Sys.glob(file.path(site_dir, "data", "report-card-locks-*.json")))
+  cols <- paste(sprintf("%s %s", names(REPORT_CARD_LOCK_COLUMNS), REPORT_CARD_LOCK_COLUMNS), collapse = ", ")
+  dbExecute(con, sprintf("CREATE OR REPLACE TABLE raw_report_card_locks (%s)", cols))
+  if (length(files) > 0) {
+    spec <- paste(sprintf("'%s': '%s'", names(REPORT_CARD_LOCK_COLUMNS), REPORT_CARD_LOCK_COLUMNS), collapse = ", ")
+    for (f in files) {
+      dbExecute(con, sprintf("INSERT INTO raw_report_card_locks BY NAME
+        SELECT * FROM read_json('%s', format = 'array', columns = {%s})", normalizePath(f), spec))
+    }
+  }
+  n <- dbGetQuery(con, "SELECT COUNT(DISTINCT game_id || team) AS n FROM raw_report_card_locks")$n
+  message("raw_report_card_locks: ", n, " locked matchups")
+  invisible(n)
+}
+
+# Rewrites each season's lock file: rows already in it for games that have
+# kicked off stay exactly as they are; every game that hasn't kicked off gets
+# this run's calls, so the rows kept are the last run's before kickoff. Only a
+# run for today writes (a pretend --date would lock today's data as the past).
+export_report_card_locks <- function(con, run_date, site_dir = "site") {
+  if (as.Date(run_date) != Sys.Date()) {
+    message("report-card locks: not written for a pretend --date")
+    return(invisible(NULL))
+  }
+  data_dir <- file.path(site_dir, "data")
+  dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
+  cutoff <- lock_before(run_date)
+  started <- sprintf("(SELECT game_id FROM raw_schedules
+      WHERE gametime IS NOT NULL
+        AND strptime(CAST(gameday AS VARCHAR) || ' ' || left(CAST(gametime AS VARCHAR), 5), '%%Y-%%m-%%d %%H:%%M')
+            <= strptime('%s', '%%Y-%%m-%%d %%H:%%M'))", cutoff)
+  cols <- paste(names(REPORT_CARD_LOCK_COLUMNS), collapse = ", ")
+  dbExecute(con, sprintf("CREATE OR REPLACE TEMP TABLE report_card_locks_next AS
+    SELECT %s FROM raw_report_card_locks WHERE game_id IN %s
+    UNION ALL BY NAME
+    SELECT f.* EXCLUDE (locked_at), COALESCE(
+             -- keep the stamp of a pending row whose calls haven't changed
+             (SELECT any_value(l.locked_at) FROM raw_report_card_locks l
+              WHERE l.game_id = f.game_id AND l.team = f.team AND l.call_no = f.call_no AND l.said = f.said),
+             '%s') AS locked_at
+    FROM (SELECT *, NULL AS locked_at FROM report_card_pregame_fresh) f
+    WHERE f.game_id NOT IN %s
+      AND f.game_id IN (SELECT game_id FROM raw_schedules WHERE result IS NULL)",
+    cols, started, updated_stamp(), started))
+  seasons <- dbGetQuery(con, "SELECT DISTINCT season FROM report_card_locks_next ORDER BY 1")$season
+  for (season in seasons) {
+    path <- file.path(normalizePath(data_dir), sprintf("report-card-locks-%d.json", as.integer(season)))
+    dbExecute(con, sprintf("COPY (SELECT %s FROM report_card_locks_next WHERE season = %d
+      ORDER BY week, game_id, team, call_no) TO '%s' (FORMAT JSON, ARRAY true)", cols, as.integer(season), path))
+    message("exported ", path)
+  }
+  invisible(seasons)
+}
+
 # Writes site/data/report-cards-<season>.json: every graded matchup of the
 # season (the condensed notes and what happened) for the archive page.
 export_report_cards <- function(con, season, site_dir = "site") {
