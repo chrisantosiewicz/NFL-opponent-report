@@ -259,13 +259,19 @@ m AS (
 
 pc AS (SELECT c.* FROM report_card_pregame c JOIN m USING (season, week, team)),
 
+-- Fumbles after the catch (added Nov 27, 2026): a completed pass is graded on
+-- its value up to the moment the receiver lost the ball, so a lost fumble
+-- doesn't turn an open receiver into a coverage "win" (week 12 of 2026: a
+-- 5-yard catch by an open Bears tight end at Detroit's 22, +0.02 EPA before
+-- the fumble and -3.83 after, flipped "target their tight ends" to a Miss).
+-- Interceptions, sacks and run fumbles still count in full.
 theirs AS (   -- their offense in the graded game
-    SELECT m.season, m.week, m.team, p.* EXCLUDE (season, week, team)
+    SELECT m.season, m.week, m.team, p.* EXCLUDE (season, week, team) REPLACE (p.epa_before_fumble AS epa)
     FROM m JOIN stg_plays p ON p.game_id = m.game_id AND p.team = m.team
 ),
 
 ours AS (     -- our offense against their defense in the graded game
-    SELECT m.season, m.week, m.team, p.* EXCLUDE (season, week, team)
+    SELECT m.season, m.week, m.team, p.* EXCLUDE (season, week, team) REPLACE (p.epa_before_fumble AS epa)
     FROM m JOIN stg_plays p ON p.game_id = m.game_id AND p.team = m.opponent
 ),
 

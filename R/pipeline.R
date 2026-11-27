@@ -25,7 +25,11 @@ PBP_COLUMNS <- c(
   "run_location", "run_gap", "pass_location", "pass_length",
   # the gamebook's kickoff weather text ("Rain Temp: 45° F, ..."), for the
   # rain and snow history next to the forecast (36_game_weather.sql)
-  "weather"
+  "weather",
+  # EPA up to the moment a receiver lost a fumble after a completed catch
+  # (nflverse qb_epa; equals epa on every other play), so the report card can
+  # grade coverage on the catch, not the fumble (31_report_card.sql)
+  "qb_epa"
 )
 
 # Side feeds for the trade check. Each has a fixed column list so a failed
