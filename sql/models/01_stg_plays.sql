@@ -37,6 +37,10 @@ SELECT
     wp,
     xpass,
     epa,
+    -- EPA up to a receiver's lost fumble after the catch: the play's value
+    -- before the ball came out. Equals epa on every other play. The report
+    -- card grades on it (see _shared/definitions.md, "Fumbles after the catch").
+    COALESCE(qb_epa, epa)          AS epa_before_fumble,
     CAST(success AS INTEGER)       AS is_success,
     passer_id,                     -- gsis ids, for the trade check
     rusher_id,
