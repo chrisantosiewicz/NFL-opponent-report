@@ -12,7 +12,7 @@ Load, model, test, render, write notes, publish. One command runs the code steps
 | 6 Draft notes | `sql/models/30_draft_notes.sql`, `write_draft_notes()` | `site/notes/drafts/<slug>.md` | **a person**: Chris edits and saves to `site/notes/<slug>.md` |
 | 7 Publish | `.github/workflows/weekly-report.yml`, `build_site()` | `site/index.html`, GitHub Pages | Action is green on `main` |
 | 8 Grade | `sql/models/31_report_card.sql`, `sql/export/site_report_cards.sql` | `site/data/report-cards-<season>.json` | `test_report_card_valid` |
-| 9 Update | `Rscript run_pipeline.R --update` (Thu, Sat, Sun, Mon morning crons, and each W2 push from the laptop) | the published week's `site/data/<season>-week<NN>.json` (and the league's current week if the focal team is on bye): injuries, lines, forecast; and `report-cards-<season>.json`, so a game is graded the morning after it is played | no report rendered |
+| 9 Update | `Rscript run_pipeline.R --update` (Thu, Sat, Sun, Mon morning crons, and each W2 push from the laptop) | the published week's `site/data/<season>-week<NN>.json` (and the league's current week if the focal team is on bye): injuries, lines, forecast; and `report-cards-<season>.json`, so a game is graded at the next update after it is played | no report rendered |
 
 Factory (stable, every run): [_shared/definitions.md](_shared/definitions.md), `config/`, `report/helpers.R` (`MIN_N`), `report/report.css`.
 Product (new each run): `site/reports/`, `site/data/`, `site/notes/drafts/`, `site/index.html`.

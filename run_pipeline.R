@@ -48,7 +48,7 @@ export_report_card_locks(con, run_date)
 # push; see .github/workflows/weekly-report.yml) refresh the live page's data
 # for the week already published: injury reports, lines and the game-day
 # forecast. They render no report. They do regrade the report card, so a game
-# shows its graded calls on the archive the morning after it is played
+# shows its graded calls on the archive at the next update after it is played
 # instead of waiting for Tuesday (Thanksgiving 2026: Eagles-Cowboys and
 # Chiefs-Bills had locked calls but nothing graded for five days).
 if (isTRUE(arg("update", FALSE))) {
