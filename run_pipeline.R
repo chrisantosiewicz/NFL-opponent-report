@@ -44,11 +44,15 @@ check_league_moves(con, run_date)
 # before kickoff is the one kept).
 export_report_card_locks(con, run_date)
 
-# Update runs (Thursday, Saturday, Sunday and Monday mornings; see
-# .github/workflows/weekly-report.yml) refresh the live page's data for the
-# week already published: injury reports, lines and the game-day forecast.
-# They render no report and leave the archive alone.
+# Update runs (Thursday, Saturday, Sunday and Monday mornings, and each W2
+# push; see .github/workflows/weekly-report.yml) refresh the live page's data
+# for the week already published: injury reports, lines and the game-day
+# forecast. They render no report. They do regrade the report card, so a game
+# shows its graded calls on the archive the morning after it is played
+# instead of waiting for Tuesday (Thanksgiving 2026: Eagles-Cowboys and
+# Chiefs-Bills had locked calls but nothing graded for five days).
 if (isTRUE(arg("update", FALSE))) {
+  export_report_cards(con, nflreadr::most_recent_season())
   week <- find_update_week(con, run_date)
   # Also the league's current week when the focal team is on bye that week.
   weeks <- unique(rbind(week, find_league_week(con, run_date)))
